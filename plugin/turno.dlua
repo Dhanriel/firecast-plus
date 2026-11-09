@@ -1,0 +1,102 @@
+require("firecast.lua")
+require("ndb.lua")
+local UI = require("ui.dlua")
+local ChatInfo = require("chatinfo.dlua")
+local Palavras = require("palavras.dlua")
+local novo = UI.novo
+
+-- Rastreador de turno: o mestre monta a ordem e avanca; o anuncio vai no chat da mesa (todos veem)
+-- e o plugin do jogador da vez toca o beep. So vale anuncio vindo de um mestre.
+local turno = {}
+
+local ANUNCIO = "Vez de: "
+local cfg = NDB.load("turno.xml") -- por mesa: o<codigo> = ordem (uma por linha), i<codigo> = indice atual
+
+local function linhas(texto)
+	local t = {}
+	for l in tostring(texto or ""):gmatch("[^\r\n]+") do
+		l = l:gsub("^%s+", ""):gsub("%s+$", "")
+		if l ~= "" then t[#t + 1] = l end
+	end
+	return t
+end
+
+local function normalizar(s)
+	return string.lower(tostring(s or ""):gsub("%[§[^%]]*%]", ""))
+end
+
+-- o nome anunciado e de quem le? (nick sem cores ou login, sem diferenciar maiusculas)
+function turno.ehMeu(nome, nick, login)
+	nome = normalizar(nome)
+	return nome ~= "" and (nome == normalizar(nick) or nome == normalizar(login))
+end
+
+-- nome de quem tem a vez, se o texto for um anuncio "Vez de: Nome" (cores do Talemark ignoradas)
+function turno.nomeAnunciado(texto)
+	return (tostring(texto or ""):gsub("%[§[^%]]*%]", "")):match("^" .. ANUNCIO .. "(.+)$")
+end
+
+Firecast.Messaging.listen("ChatMessage", function(message)
+	local autor, mesa = message.player, message.room
+	if autor == nil or mesa == nil or not autor.isMestre then return end
+	local nome = turno.nomeAnunciado(message.content)
+	local eu = mesa.meuJogador
+	if nome == nil or eu == nil or not turno.ehMeu(nome, ChatInfo.nick(eu), eu.login) then return end
+	Palavras.tocar(message.chat)
+	if message.chat ~= nil then message.chat:escrever("[§B]>>> É A SUA VEZ! <<<[§R]") end
+end)
+
+function turno.abrir(mesa)
+	local eu = mesa.meuJogador
+	local chat = mesa.chat or mesa.activeChat
+	if eu == nil or not eu.isMestre then
+		if chat ~= nil then chat:escrever("Só o mestre edita a ordem de turnos.") end
+		return
+	end
+	local codigo = tostring(mesa.codigoInterno)
+	if cfg["o" .. codigo] == nil then -- primeira vez: sugere os jogadores da mesa
+		local nomes = {}
+		for _, j in ipairs(mesa.jogadores or {}) do
+			if not j.isMestre and not j.isEspectador then nomes[#nomes + 1] = ChatInfo.nick(j) end
+		end
+		cfg["o" .. codigo] = table.concat(nomes, "\n")
+	end
+
+	local frm, fundo = UI.janela("frmFCPlusTurno", "Ordem de turnos", 300, 420)
+	novo("label", fundo, {align = "top", height = 30, wordWrap = true, fontColor = "#BBBBBB", fontSize = 11,
+		text = "Um nome por linha, na ordem de iniciativa (nick ou login)."})
+	local atual = novo("label", fundo, {align = "top", height = 24, fontColor = "white"})
+	local botoes = novo("layout", fundo, {align = "bottom", height = 34, margins = {top = 6}})
+	local btnProx = novo("button", botoes, {align = "right", width = 120, text = "Próximo turno"})
+	local btnZerar = novo("button", botoes, {align = "left", width = 110, text = "Recomeçar"})
+	local ordem = novo("textEditor", fundo, {align = "client", text = cfg["o" .. codigo]})
+
+	local function mostrar()
+		local t = linhas(cfg["o" .. codigo])
+		local i = tonumber(cfg["i" .. codigo] or 0) or 0
+		atual.text = (t[i] ~= nil) and ("Vez de: " .. t[i]) or "Nenhum turno anunciado ainda."
+	end
+	ordem:addEventListener("onChange", function() cfg["o" .. codigo] = ordem.text end)
+	btnProx:addEventListener("onClick", function()
+		local t = linhas(ordem.text)
+		if #t == 0 then return end
+		local i = ((tonumber(cfg["i" .. codigo] or 0) or 0) % #t) + 1
+		cfg["o" .. codigo], cfg["i" .. codigo] = ordem.text, i
+		if chat ~= nil then chat:enviarMensagem(ANUNCIO .. t[i]) end
+		mostrar()
+	end)
+	btnZerar:addEventListener("onClick", function()
+		cfg["i" .. codigo] = 0
+		mostrar()
+	end)
+	mostrar()
+	frm:endUpdate()
+	frm:show()
+end
+
+assert(turno.ehMeu("zerakhiel", "Zerakhiel", "x") and turno.ehMeu("[§K24]Zera[§K27]khiel", "Zerakhiel", "x"))
+assert(turno.ehMeu("Login1", "Outro", "login1") and not turno.ehMeu("", "", "") and not turno.ehMeu("Lila", "Lyra", "lyra"))
+assert(turno.nomeAnunciado("[§B]Vez de: Lila[§R]") == "Lila" and turno.nomeAnunciado("vez de Lila") == nil)
+assert(#linhas("  A \n\nB\r\n C ") == 3 and linhas("  A \n")[1] == "A")
+
+return turno

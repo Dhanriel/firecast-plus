@@ -1,0 +1,121 @@
+require("firecast.lua")
+require("ndb.lua")
+require("audio.lua")
+local Utils = require("utils.lua")
+local UI = require("ui.dlua")
+local ChatInfo = require("chatinfo.dlua")
+local novo = UI.novo
+
+-- Beep quando alguem escreve no chat uma palavra da lista (so neste computador).
+local palavras = {}
+
+local SOM = "/sons/highlight.mp3" -- o mesmo som de mencao do Firecast
+local cfg = NDB.load("palavras.xml")
+local ultimoBeep = 0
+local avisouErroSom = false
+
+local function normalizar(s)
+	return string.lower(Utils.removerAcentos(tostring(s or "")))
+end
+
+function palavras.lista()
+	local t = {}
+	for p in string.gmatch(tostring(cfg.lista or ""), "[^\n]+") do t[#t + 1] = p end
+	return t
+end
+
+local function salvar(t)
+	cfg.lista = table.concat(t, "\n")
+end
+
+function palavras.adicionar(p)
+	p = (tostring(p or ""):gsub("^%s+", ""):gsub("%s+$", ""))
+	if p == "" then return false end
+	local t = palavras.lista()
+	for _, q in ipairs(t) do
+		if normalizar(q) == normalizar(p) then return false end
+	end
+	t[#t + 1] = p
+	salvar(t)
+	return true
+end
+
+function palavras.remover(p)
+	local t = {}
+	for _, q in ipairs(palavras.lista()) do
+		if normalizar(q) ~= normalizar(p) then t[#t + 1] = q end
+	end
+	salvar(t)
+end
+
+-- devolve a primeira palavra da lista contida no texto (sem diferenciar maiusculas/acentos)
+function palavras.achar(texto)
+	local alvo = normalizar(texto)
+	for _, p in ipairs(palavras.lista()) do
+		if string.find(alvo, normalizar(p), 1, true) then return p end
+	end
+end
+
+function palavras.tocar(chat)
+	local agora = os.time()
+	if agora - ultimoBeep < 2 then return end -- uma rajada de mensagens toca um beep so
+	ultimoBeep = agora
+	Audio.play(SOM, 1.0):onError(function(err)
+		if not avisouErroSom and chat ~= nil then
+			avisouErroSom = true
+			chat:escrever("Nao consegui tocar o beep: " .. tostring(err))
+		end
+	end)
+end
+
+Firecast.Messaging.listen("ChatMessage", function(message)
+	if ChatInfo.souEu(message) then return end
+	if palavras.achar(message.content) then palavras.tocar(message.chat) end
+end)
+
+local function construir()
+	local frm, fundo = UI.janela("frmFCPlusPalavras", "Beep por palavra", 320, 380)
+	novo("label", fundo, {align = "top", height = 34, wordWrap = true, fontColor = "#BBBBBB", fontSize = 11,
+		text = "Toca um beep quando alguém escrever uma destas palavras (maiúsculas não importam)."})
+
+	local linha = novo("layout", fundo, {align = "top", height = 32, margins = {top = 6}})
+	local btnAdd = novo("button", linha, {align = "right", width = 90, text = "Adicionar"})
+	local edt = novo("edit", linha, {align = "client", margins = {right = 6}})
+
+	local caixa = novo("scrollBox", fundo, {align = "client", margins = {top = 8}})
+	local linhas = {}
+
+	local function redesenhar()
+		for _, l in ipairs(linhas) do l:destroy() end
+		linhas = {}
+		for _, p in ipairs(palavras.lista()) do
+			local l = novo("layout", caixa, {align = "top", height = 28, margins = {bottom = 2}})
+			novo("label", l, {align = "client", text = p, fontColor = "white"})
+			local x = novo("button", l, {align = "right", width = 70, text = "Remover"})
+			x:addEventListener("onClick", function()
+				palavras.remover(p)
+				setTimeout(redesenhar, 1) -- nao destruir o botao dentro do proprio clique
+			end)
+			linhas[#linhas + 1] = l
+		end
+	end
+
+	local function adicionar()
+		if palavras.adicionar(edt.text) then redesenhar() end
+		edt.text = ""
+	end
+	btnAdd:addEventListener("onClick", adicionar)
+	edt:addEventListener("onKeyUp", function(event)
+		if event.keyCode == 13 then adicionar() end
+	end)
+
+	redesenhar()
+	frm:endUpdate()
+	return frm
+end
+
+function palavras.abrir()
+	construir():show()
+end
+
+return palavras

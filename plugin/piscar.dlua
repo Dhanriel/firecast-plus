@@ -1,0 +1,103 @@
+require("firecast.lua")
+require("ndb.lua")
+local UI = require("ui.dlua")
+local ChatInfo = require("chatinfo.dlua")
+local novo = UI.novo
+
+-- Escolhe por mesa e por aba quem faz o icone piscar. Com o "Piscar" nativo desligado,
+-- o plugin pede ao ajudante (Firecast Plus.pyw) para piscar so quando a mesa E a aba permitem.
+local piscar = {}
+
+local cfg = NDB.load("piscar.xml")
+local regras, ordem = {}, {} -- chave -> {pisca=bool, nome=string}; ordem guarda a sequencia da janela
+local ultimoPedido = 0
+
+local function carregar()
+	for linha in string.gmatch(tostring(cfg.dados or ""), "[^\n]+") do
+		local chave, valor, nome = linha:match("^(.-)\t([01])\t(.*)$")
+		if chave ~= nil then
+			regras[chave] = {pisca = valor == "1", nome = nome}
+			ordem[#ordem + 1] = chave
+		end
+	end
+end
+
+local function salvar()
+	local t = {}
+	for _, chave in ipairs(ordem) do
+		local r = regras[chave]
+		t[#t + 1] = chave .. "\t" .. (r.pisca and "1" or "0") .. "\t" .. r.nome:gsub("[\t\n]", " ")
+	end
+	cfg.dados = table.concat(t, "\n")
+end
+
+-- registra a mesa/aba na primeira vez que aparece (pisca por padrao) e devolve a regra
+local function regra(chave, nome)
+	local r = regras[chave]
+	if r == nil then
+		r = {pisca = true, nome = nome}
+		regras[chave] = r
+		ordem[#ordem + 1] = chave
+		salvar()
+	elseif r.nome ~= nome then
+		r.nome = nome -- a mesa pode ter mudado de nome
+		salvar()
+	end
+	return r
+end
+
+carregar()
+
+Firecast.Messaging.listen("ChatMessage", function(message)
+	if ChatInfo.souEu(message) then return end
+	local mesaChave, mesaNome = ChatInfo.mesa(message)
+	local abaChave, abaNome = ChatInfo.aba(message)
+	local rMesa = regra("m|" .. mesaChave, mesaNome)
+	local rAba = regra("a|" .. mesaChave .. "|" .. abaChave, abaNome)
+	if not (rMesa.pisca and rAba.pisca) then return end
+	local agora = os.time()
+	if agora == ultimoPedido then return end
+	ultimoPedido = agora
+	UI.escrever("piscar.txt", tostring(agora))
+end)
+
+local function construir()
+	local frm, fundo = UI.janela("frmFCPlusPiscar", "Piscar na barra de tarefas", 380, 460)
+	novo("label", fundo, {align = "top", height = 48, wordWrap = true, fontColor = "#BBBBBB", fontSize = 11,
+		text = "Desligue o \"Piscar\" nas Configurações > Notificações do Firecast e abra pelo atalho Firecast Plus. " ..
+		       "Mesas e abas aparecem aqui quando chega a primeira mensagem nelas."})
+
+	local caixa = novo("scrollBox", fundo, {align = "client", margins = {top = 8}})
+	local function linha(chave, recuo)
+		local r = regras[chave]
+		local cb = novo("checkBox", caixa, {align = "top", height = 26, text = r.nome, checked = r.pisca,
+			fontColor = "white", margins = {left = recuo}})
+		cb:addEventListener("onChange", function()
+			r.pisca = cb.checked == true
+			salvar()
+		end)
+	end
+
+	-- cada mesa e logo abaixo as abas dela
+	for _, chave in ipairs(ordem) do
+		local mesa = chave:match("^m|(.*)$")
+		if mesa ~= nil then
+			linha(chave, 0)
+			for _, c in ipairs(ordem) do
+				if c:sub(1, #mesa + 3) == "a|" .. mesa .. "|" then linha(c, 24) end
+			end
+		end
+	end
+	if #ordem == 0 then
+		novo("label", caixa, {align = "top", height = 24, text = "Nenhuma mensagem recebida ainda.", fontColor = "#BBBBBB"})
+	end
+
+	frm:endUpdate()
+	return frm
+end
+
+function piscar.abrir()
+	construir():show()
+end
+
+return piscar

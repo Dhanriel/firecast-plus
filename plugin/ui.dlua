@@ -1,0 +1,39 @@
+require("rrpgGUI.lua")
+require("vhd.lua")
+local Utils = require("utils.lua")
+
+-- helpers para montar janelas em Lua puro (sem .lfm compilado pelo rdk) e falar com o ajudante
+local ui = {}
+
+-- grava um arquivo na pasta do plugin (%APPDATA%\Firecast\Plugins\momotoro.firecast.plus_vhd), que o ajudante le
+function ui.escrever(nome, texto)
+	if VHD.fileExists(nome) then VHD.deleteFile(nome) end
+	local f = VHD.openFile(nome, "w")
+	local buf = {}
+	local n = Utils.binaryEncode(buf, "utf8", texto)
+	f:write(buf, n)
+	f:close()
+end
+
+function ui.novo(tipo, pai, props)
+	local c = GUI.fromHandle(_obj_newObject(tipo))
+	c:setParent(pai)
+	for k, v in pairs(props or {}) do c[k] = v end
+	return c
+end
+
+-- devolve a janela e o painel de fundo onde vao os controles
+function ui.janela(nome, titulo, largura, altura)
+	local frm = GUI.fromHandle(_obj_newObject("popupForm"))
+	_gui_assignInitialParentForForm(frm.handle)
+	frm:beginUpdate()
+	frm:setName(nome)
+	frm:setWidth(largura)
+	frm:setHeight(altura)
+	frm:setTitle(titulo)
+	local fundo = ui.novo("rectangle", frm, {align = "client", color = "#1A1A1A", padding = {left = 12, right = 12, top = 10, bottom = 10}})
+	ui.novo("label", fundo, {align = "top", height = 24, text = titulo, fontSize = 16, fontColor = "white"})
+	return frm, fundo
+end
+
+return ui

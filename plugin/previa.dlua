@@ -1,0 +1,139 @@
+require("firecast.lua")
+require("ndb.lua")
+require("internet.lua")
+local UI = require("ui.dlua")
+local novo = UI.novo
+
+-- Previa de links no chat (estilo Discord), so na tela de quem tem o plugin.
+-- A imagem vai como [§I url] numa linha local logo depois da mensagem; quem desenha e o proprio chat.
+local previa = {}
+
+local LIMITE = 8 * 1024 * 1024 -- imagens maiores que isso nao viram previa
+local EXT = {png = true, jpg = true, jpeg = true, gif = true, webp = true}
+
+local cfg = NDB.load("previa.xml")
+if cfg.imagens == nil then cfg.imagens = true end
+if cfg.videos == nil then cfg.videos = true end
+
+local recentes = {} -- url -> os.time(), para nao repetir a mesma previa
+local janela = {}   -- os.time() das ultimas previas, para nao inundar o chat (ex.: historico ao entrar)
+
+-- so http/https, sem caracteres que quebrariam a marcacao [§I ...]
+function previa.links(texto)
+	local t = {}
+	texto = tostring(texto or ""):gsub("%[§I[^%]]*%]", "") -- imagem que o chat ja mostra (ex.: print colado)
+	for url in texto:gmatch("https?://[^%s%[%]<>\"'§]+") do
+		url = url:gsub("[%.,;:!%?%)]+$", "") -- pontuacao colada no fim da frase
+		if #t < 3 then t[#t + 1] = url end
+	end
+	return t
+end
+
+function previa.youtubeID(url)
+	local id = url:match("^https?://[%w%.]*youtube%.com/watch%?.-v=([%w_%-]+)")
+		or url:match("^https?://youtu%.be/([%w_%-]+)")
+		or url:match("^https?://[%w%.]*youtube%.com/shorts/([%w_%-]+)")
+	if id ~= nil and #id == 11 then return id end
+end
+
+function previa.extensao(url)
+	local ext = (url:match("^[^?#]+%.(%w+)$") or url:match("^[^?#]+%.(%w+)[?#]") or ""):lower()
+	return EXT[ext] == true
+end
+
+local function podeMostrar(url)
+	local agora = os.time()
+	if recentes[url] ~= nil and agora - recentes[url] < 30 then return false end
+	local n = 0
+	for _, t in ipairs(janela) do if agora - t < 10 then n = n + 1 end end
+	if n >= 4 then return false end
+	recentes[url] = agora
+	table.insert(janela, agora)
+	if #janela > 20 then table.remove(janela, 1) end
+	return true
+end
+
+local function escrever(chat, texto)
+	pcall(function() chat:escrever(texto) end)
+end
+
+local function desescaparJSON(s)
+	s = s:gsub("\\u(%x%x%x%x)", function(h) return utf8.char(tonumber(h, 16)) end)
+	return (s:gsub("\\(.)", {n = " ", t = " ", r = "", ["\""] = "\"", ["\\"] = "\\", ["/"] = "/"}))
+end
+
+local function requisicao(metodo, url, aoResponder)
+	local ok = pcall(function()
+		local r = Internet.newHTTPRequest(metodo, url)
+		r:addEventListener("onResponse", function() pcall(aoResponder, r) end)
+		r:addEventListener("onError", function() pcall(aoResponder, nil) end)
+		r:send()
+	end)
+	if not ok then pcall(aoResponder, nil) end
+end
+
+local function mostrarVideo(chat, id)
+	local link = "https://youtu.be/" .. id
+	requisicao("GET", "https://www.youtube.com/oembed?format=json&url=" .. Internet.httpEncode(link), function(r)
+		local titulo = r ~= nil and r.status == 200 and tostring(r.responseText or ""):match('"title"%s*:%s*"(.-[^\\])"')
+		if titulo then titulo = desescaparJSON(titulo):gsub("[%[§]", "") else titulo = "Vídeo do YouTube" end -- sem marcacao no titulo
+		escrever(chat, "[§I https://img.youtube.com/vi/" .. id .. "/hqdefault.jpg]")
+		escrever(chat, "▶ " .. titulo .. " — " .. link)
+	end)
+end
+
+local function mostrarImagem(chat, url)
+	local extOk = previa.extensao(url)
+	requisicao("HEAD", url, function(r)
+		local tipo = r ~= nil and r.status == 200 and tostring(r:getResponseHeader("Content-Type") or ""):lower() or ""
+		local tamanho = r ~= nil and r.status == 200 and tonumber(r:getResponseHeader("Content-Length") or "") or nil
+		local ehImagem = tipo:find("^image/") ~= nil or (extOk and tipo == "") -- sem resposta, confia na extensao
+		if not ehImagem then return end
+		if tamanho ~= nil and tamanho > LIMITE then
+			escrever(chat, string.format("Imagem grande demais para prévia (%.1f MB), abra pelo link.", tamanho / 1048576))
+			return
+		end
+		escrever(chat, "[§I " .. url .. "]")
+	end)
+end
+
+Firecast.Messaging.listen("ChatMessage", function(message)
+	local chat = message.chat
+	if chat == nil or not (cfg.imagens or cfg.videos) then return end
+	for _, url in ipairs(previa.links(message.content)) do
+		local id = previa.youtubeID(url)
+		if id ~= nil then
+			if cfg.videos and podeMostrar(url) then mostrarVideo(chat, id) end
+		elseif cfg.imagens and podeMostrar(url) then
+			mostrarImagem(chat, url)
+		end
+	end
+end)
+
+local function construir()
+	local frm, fundo = UI.janela("frmFCPlusPrevia", "Prévia de links", 320, 200)
+	novo("label", fundo, {align = "top", height = 34, wordWrap = true, fontColor = "#BBBBBB", fontSize = 11,
+		text = "Mostra imagens e vídeos do YouTube logo abaixo das mensagens. Só você vê."})
+	local cbImg = novo("checkBox", fundo, {align = "top", height = 28, text = "Imagens", checked = cfg.imagens == true, fontColor = "white"})
+	local cbVid = novo("checkBox", fundo, {align = "top", height = 28, text = "Vídeos do YouTube", checked = cfg.videos == true, fontColor = "white"})
+	cbImg:addEventListener("onChange", function() cfg.imagens = cbImg.checked == true end)
+	cbVid:addEventListener("onChange", function() cfg.videos = cbVid.checked == true end)
+	frm:endUpdate()
+	return frm
+end
+
+function previa.abrir()
+	construir():show()
+end
+
+-- autoteste das partes puras
+assert(previa.youtubeID("https://www.youtube.com/watch?v=dQw4w9WgXcQ&t=1") == "dQw4w9WgXcQ")
+assert(previa.youtubeID("https://youtu.be/dQw4w9WgXcQ") == "dQw4w9WgXcQ")
+assert(previa.youtubeID("https://youtube.com/shorts/dQw4w9WgXcQ?feature=x") == "dQw4w9WgXcQ")
+assert(previa.youtubeID("https://example.com/watch?v=x") == nil)
+assert(previa.extensao("https://a.com/x.PNG?w=2") and previa.extensao("http://a.com/b/c.gif") and not previa.extensao("https://a.com/png"))
+assert(previa.links("olha https://a.com/x.png, e [§I https://b.com/y]")[1] == "https://a.com/x.png")
+assert(#previa.links("[§I https://firedrive.com/print.png]") == 0 and #previa.links("[§Ihttps://a.com/x.png]") == 0)
+assert(#previa.links("ftp://a.com/x.png javascript:alert(1)") == 0)
+
+return previa

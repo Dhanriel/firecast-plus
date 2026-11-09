@@ -1,0 +1,112 @@
+require("firecast.lua")
+require("rrpgGUI.lua")
+require("vhd.lua")
+require("ndb.lua")
+local UI = require("ui.dlua")
+local novo = UI.novo
+
+-- Janela de cores. Grava pedido.json na pasta do plugin; o ajudante (Firecast Plus.pyw) aplica e reinicia.
+local cores = {}
+
+local PRESETS = {
+	{"Original", "#EB3449", "#212121", "#F2F2F2"},
+	{"Roxo", "#9F34EB", "#1D192F", "#F2F2F2"},
+	{"Azul", "#2D8CFF", "#15202B", "#E8F0F8"},
+	{"Verde", "#2FBF71", "#141E18", "#EEF5EF"},
+	{"Âmbar", "#F5A623", "#1E1A14", "#F5EFE6"},
+}
+
+-- fontes que vem com o Windows; Roboto e a do tema
+local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS"}
+local TAMANHOS = {{"Normal", "14"}, {"Grande", "16"}, {"Maior", "18"}, {"Enorme", "21"}}
+
+local cfg = NDB.load("cores.xml")
+
+local function construir()
+	local frm, fundo = UI.janela("frmFCPlusCores", "Cores e fonte do Firecast", 360, 440)
+
+	local campos = {}
+	for _, item in ipairs({{"destaque", "Destaque"}, {"fundo", "Fundo"}, {"texto", "Texto"}}) do
+		local linha = novo("layout", fundo, {align = "top", height = 32, margins = {top = 4}})
+		novo("label", linha, {align = "left", width = 90, text = item[2], fontColor = "white"})
+		campos[item[1]] = novo("colorComboBox", linha, {align = "client", useAlpha = false})
+	end
+	local function linha(rotulo)
+		local l = novo("layout", fundo, {align = "top", height = 32, margins = {top = 4}})
+		novo("label", l, {align = "left", width = 90, text = rotulo, fontColor = "white"})
+		return l
+	end
+	local nomesTam, valoresTam = {}, {}
+	for i, t in ipairs(TAMANHOS) do nomesTam[i], valoresTam[i] = t[1], t[2] end
+	local fonte = novo("comboBox", linha("Fonte"), {align = "client", items = FONTES, values = FONTES})
+	local tamanho = novo("comboBox", linha("Texto do chat"), {align = "client", items = nomesTam, values = valoresTam})
+	fonte.value, tamanho.value = cfg.fonte or FONTES[1], cfg.tamanho or TAMANHOS[1][2]  -- depois dos items
+
+	-- previa: so desta janela; o Firecast inteiro muda depois de reiniciar
+	local previa = novo("rectangle", fundo, {align = "top", height = 76, margins = {top = 10}, xradius = 6, yradius = 6})
+	local previaTexto = novo("label", previa, {align = "top", height = 34, text = "  Texto de exemplo no chat", margins = {top = 6}})
+	local previaBotao = novo("rectangle", previa, {align = "left", width = 120, margins = {left = 10, bottom = 8}, xradius = 4, yradius = 4})
+	novo("label", previaBotao, {align = "client", text = "Botão", horzTextAlign = "center", fontColor = "white"})
+
+	local function atualizarPrevia()
+		previa.color = campos.fundo.color
+		previaTexto.fontColor = campos.texto.color
+		previaBotao.color = campos.destaque.color
+		previaTexto.fontFamily = fonte.value
+		previaTexto.fontSize = tonumber(tamanho.value) or 14
+	end
+
+	local function usar(d, f, t)
+		campos.destaque.color, campos.fundo.color, campos.texto.color = d, f, t
+		atualizarPrevia()
+	end
+
+	local linhaPresets = novo("flowLayout", fundo, {align = "top", height = 64, margins = {top = 10}})
+	for _, p in ipairs(PRESETS) do
+		local b = novo("button", linhaPresets, {width = 62, height = 28, text = p[1], margins = {right = 4, bottom = 4}})
+		b:addEventListener("onClick", function() usar(p[2], p[3], p[4]) end)
+	end
+
+	local status = novo("label", fundo, {align = "bottom", height = 22, fontColor = "#BBBBBB", fontSize = 11})
+	local botoes = novo("layout", fundo, {align = "bottom", height = 34, margins = {bottom = 4}})
+	local btnAplicar = novo("button", botoes, {align = "right", width = 160, text = "Aplicar e reiniciar"})
+	local btnOriginal = novo("button", botoes, {align = "left", width = 140, text = "Restaurar original"})
+
+	local function pedir(json)
+		UI.escrever("pedido.json", json)
+		status.text = "Reiniciando o Firecast..."
+		-- o ajudante apaga o pedido ao ler; se continuar la, ele nao esta rodando
+		setTimeout(function()
+			if VHD.fileExists("pedido.json") then
+				VHD.deleteFile("pedido.json")
+				status.text = "Ajudante fechado: abra pelo 'Firecast Plus.pyw'."
+			end
+		end, 4000)
+	end
+
+	btnAplicar:addEventListener("onClick", function()
+		cfg.destaque, cfg.fundo, cfg.texto = campos.destaque.color, campos.fundo.color, campos.texto.color
+		cfg.fonte, cfg.tamanho = fonte.value, tamanho.value
+		pedir(string.format('{"acao":"aplicar","destaque":"%s","fundo":"%s","texto":"%s","fonte":"%s","tamanho_chat":%d}',
+			tostring(cfg.destaque), tostring(cfg.fundo), tostring(cfg.texto), tostring(cfg.fonte), tonumber(cfg.tamanho) or 14))
+	end)
+	btnOriginal:addEventListener("onClick", function()
+		usar(PRESETS[1][2], PRESETS[1][3], PRESETS[1][4])
+		cfg.destaque, cfg.fundo, cfg.texto, cfg.fonte, cfg.tamanho = nil, nil, nil, nil, nil
+		fonte.value, tamanho.value = FONTES[1], TAMANHOS[1][2]
+		pedir('{"acao":"restaurar"}')
+	end)
+	for _, c in pairs(campos) do c:addEventListener("onChange", atualizarPrevia) end
+	fonte:addEventListener("onChange", atualizarPrevia)
+	tamanho:addEventListener("onChange", atualizarPrevia)
+
+	usar(cfg.destaque or PRESETS[1][2], cfg.fundo or PRESETS[1][3], cfg.texto or PRESETS[1][4])
+	frm:endUpdate()
+	return frm
+end
+
+function cores.abrir()
+	construir():show()
+end
+
+return cores

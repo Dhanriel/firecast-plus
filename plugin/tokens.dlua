@@ -1,0 +1,196 @@
+require("firecast.lua")
+require("scene.lua")
+local ChatInfo = require("chatinfo.dlua")
+local Aura = require("aura.dlua")
+
+-- Botoes "Meu token" / "Remover meu token" no mapa. O mestre cria direto; o jogador pede ao plugin
+-- do mestre por mensagem do mapa, e o mestre so atende pelo remetente que o Firecast informa.
+local MSG = "fcplus.token"
+
+local cliquePendente = {}
+local ouvintes = {} -- mantem vivos os ouvintes de mensagem de cada mapa
+
+local function escrever(scene, texto)
+	local mesa = Firecast.getMesaDe(scene)
+	if mesa ~= nil and mesa.activeChat ~= nil then mesa.activeChat:escrever(texto) end
+end
+
+local function login(s)
+	return string.lower(tostring(s or ""))
+end
+
+-- tokens deste plugin que pertencem ao login dado
+local function tokensDe(scene, dono)
+	local achados = {}
+	for i = #scene.items, 1, -1 do
+		local item = scene.items[i]
+		if item ~= nil and item.objectType == "token" and item.userData ~= nil
+		   and login(item.userData.fcplusDono) == dono then
+			achados[#achados + 1] = item
+		end
+	end
+	return achados
+end
+
+local function removerDe(scene, dono)
+	local lista = tokensDe(scene, dono)
+	for _, t in ipairs(lista) do pcall(function() t:delete() end) end
+	pcall(function() scene:sendDelayedUpdates() end)
+	return #lista
+end
+
+-- so roda no mestre: um token por jogador, com o jogador como dono (ele mesmo move)
+local function criarPara(scene, jogador, userID, x, y, pedido)
+	local dono = login(jogador.login)
+	for _, t in ipairs(tokensDe(scene, dono)) do
+		if pedido ~= nil and tostring(t.userData.fcplusPedido) == pedido then return end -- outro mestre ja atendeu
+	end
+	removerDe(scene, dono)
+	local size = scene.grid.cellSize
+	local token = scene.items:addToken("tokens")
+	token:beginUpdate()
+	token.image.url = tostring(jogador.avatar or "")
+	token.name = ChatInfo.nick(jogador)
+	token.width, token.height = size, size
+	token.snapToGrid = true
+	token.ownerUserID = userID
+	token.userData.fcplusDono = dono
+	token.userData.fcplusPedido = pedido or ""
+	token:setCenter(x, y, true)
+	token:endUpdate()
+	pcall(function() scene:sendDelayedUpdates() end)
+end
+
+local function eu(scene)
+	local mesa = Firecast.getMesaDe(scene)
+	return mesa, mesa ~= nil and mesa.meuJogador or nil
+end
+
+local function pedir(scene, acao, x, y)
+	local mesa, jogador = eu(scene)
+	if jogador == nil then
+		escrever(scene, "Nao achei voce nesta mesa.")
+		return
+	end
+	if scene.isGM then
+		if acao == "criar" then
+			criarPara(scene, jogador, scene.currentUserID, x, y, nil)
+		else
+			escrever(scene, removerDe(scene, login(jogador.login)) > 0 and "Token removido." or "Voce nao tem token neste mapa.")
+		end
+		return
+	end
+	local pedido = tostring(scene.currentUserID) .. ":" .. tostring(os.time())
+	scene:broadcastMessage(MSG, {acao = acao, x = x, y = y, userID = scene.currentUserID, pedido = pedido}, false)
+	setTimeout(function()
+		if not scene.isObjectAlive then return end
+		local tem = #tokensDe(scene, login(jogador.login)) > 0
+		if (acao == "criar" and not tem) or (acao == "remover" and tem) then
+			escrever(scene, "Nenhum mestre com o Firecast Plus respondeu. O mestre precisa ter o plugin e estar no mapa.")
+		end
+	end, 5000)
+end
+
+-- token e do jogador: o Firecast diz que e dele, ou foi criado pelo "Meu token" para ele
+local function ehDe(token, dono)
+	return login(token.userData and token.userData.fcplusDono) == dono or login(token.ownerUserID) == dono
+end
+
+local function botaoAura(scene)
+	local sel = scene.items:getSelection() or {}
+	local token = nil
+	for _, it in ipairs(sel) do
+		if it.objectType == "token" then token = it break end
+	end
+	if token == nil then
+		escrever(scene, "Selecione um token no mapa e clique em Aura de novo.")
+		return
+	end
+	local _, jogador = eu(scene)
+	if not scene.isGM and not (token.isMine == true or (jogador ~= nil and ehDe(token, login(jogador.login)))) then
+		escrever(scene, "Você só pode pôr aura no seu próprio token.")
+		return
+	end
+	Aura.abrir(token, function(o)
+		if scene.isGM then
+			Aura.aplicar(scene, token, o)
+			return
+		end
+		pcall(Aura.aplicar, scene, token, o) -- tenta direto; se o Firecast desfizer, pede ao mestre
+		setTimeout(function()
+			if not scene.isObjectAlive or not token.isObjectAlive then return end
+			if Aura.ler(token).ligada == (o.ligada == true) then return end
+			local x, y = token:getCenter()
+			scene:broadcastMessage(MSG, {acao = "aura", x = x, y = y, userID = scene.currentUserID, opcoes = o}, false)
+		end, 2000)
+	end)
+end
+
+local function cancelarClique(scene)
+	local p = cliquePendente[scene]
+	if p == nil then return end
+	cliquePendente[scene] = nil
+	pcall(function()
+		if scene.isObjectAlive ~= false and scene.viewport.onMouseUp == p.handler then
+			scene.viewport.onMouseUp = p.anterior
+		end
+	end)
+end
+
+-- mesmo esquema do plugin D&D 5e - Mapa e Magias: o proximo clique no mapa escolhe o lugar
+local function armarClique(scene, callback)
+	cancelarClique(scene)
+	local anterior = scene.viewport.onMouseUp
+	local registro = {anterior = anterior}
+	registro.handler = function(event)
+		if type(anterior) == "function" then pcall(anterior, event) end
+		if cliquePendente[scene] ~= registro then return end
+		cancelarClique(scene)
+		local x, y = scene.viewport:screenToWorld(event.x, event.y)
+		local ok, erro = pcall(callback, x, y)
+		if not ok then escrever(scene, "Erro: " .. tostring(erro)) end
+	end
+	cliquePendente[scene] = registro
+	scene.viewport.onMouseUp = registro.handler
+	escrever(scene, "Clique no mapa onde o seu token deve aparecer.")
+	setTimeout(function()
+		if cliquePendente[scene] == registro then cancelarClique(scene) end
+	end, 60000)
+end
+
+SceneLib.registerPlugin(function(scene, attachment)
+	scene.viewport:setupToolCategory("FCPlus", "Firecast Plus", 60)
+	scene.viewport:addToolButton("FCPlus", "Meu token", "/icons/token.png", 1, {}, function()
+		armarClique(scene, function(x, y) pedir(scene, "criar", x, y) end)
+	end)
+	scene.viewport:addToolButton("FCPlus", "Remover meu token", "/icons/tokenx.png", 2, {}, function()
+		pedir(scene, "remover")
+	end)
+	scene.viewport:addToolButton("FCPlus", "Aura no token selecionado", "/icons/aura.png", 3, {}, function()
+		botaoAura(scene)
+	end)
+
+	ouvintes[scene] = scene:newBroadcastListener(MSG, function(sender, _, msg)
+		if not scene.isGM or type(msg) ~= "table" then return end
+		local mesa = Firecast.getMesaDe(scene)
+		local jogador = mesa ~= nil and mesa:findJogador(sender) or nil
+		if jogador == nil or jogador.isEspectador then return end
+		-- o dono vem do remetente; o userID da mensagem so e aceito se for desse mesmo jogador
+		if login(msg.userID) ~= login(jogador.login) then
+			escrever(scene, "Pedido de token recusado: id " .. tostring(msg.userID) .. " nao bate com " .. tostring(jogador.login))
+			return
+		end
+		if msg.acao == "criar" and type(msg.x) == "number" and type(msg.y) == "number" then
+			setTimeout(function() -- espalha no tempo os mestres que atendem o mesmo pedido
+				if scene.isObjectAlive then criarPara(scene, jogador, msg.userID, msg.x, msg.y, tostring(msg.pedido)) end
+			end, math.random(1, 400))
+		elseif msg.acao == "remover" then
+			removerDe(scene, login(jogador.login))
+		elseif msg.acao == "aura" and type(msg.x) == "number" and type(msg.y) == "number" and type(msg.opcoes) == "table" then
+			local token = scene.items:itemAtPoint(msg.x, msg.y, "tokens")
+			if token ~= nil and token.objectType == "token" and ehDe(token, login(jogador.login)) then
+				Aura.aplicar(scene, token, msg.opcoes) -- aplicar valida cor/tamanho/intensidade
+			end
+		end
+	end)
+end)

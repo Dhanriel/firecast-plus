@@ -1,0 +1,41 @@
+require("firecast.lua")
+
+-- O que o plugin precisa saber de cada mensagem: se e minha e de qual mesa/aba ela veio.
+local info = {}
+
+-- nick sem os codigos de cor do Firecast, ex.: "[§K24]Zera[§K27]khiel" -> "Zerakhiel"
+function info.nick(jogador)
+	return (tostring(jogador.nick or jogador.login or ""):gsub("%[§[^%]]*%]", ""))
+end
+assert(info.nick({nick = "[§K24]Zera[§K27]khiel"}) == "Zerakhiel")
+
+function info.souEu(message)
+	local autor = message.player
+	return autor ~= nil and tostring(autor.login or "") == tostring(Firecast.getCurrentUser().login or "")
+end
+
+-- chave e nome da mesa; conversas fora de mesa ficam juntas
+function info.mesa(message)
+	local mesa = message.room
+	if mesa == nil then return "fora", "Fora de mesa" end
+	return tostring(mesa.codigoInterno), tostring(mesa.nome or "Mesa")
+end
+
+-- chave e nome da aba (chat), estaveis entre sessoes
+function info.aba(message)
+	local chat = message.chat
+	local m = (chat ~= nil and chat.medium) or {}
+	local chave = table.concat({tostring(m.kind), tostring(m.user1), tostring(m.user2),
+		tostring(m.groupId), tostring(m.channelId)}, ":")
+	local nome
+	if message.pvtPlayer ~= nil then
+		nome = "Privado: " .. info.nick(message.pvtPlayer)
+	elseif m.kind == nil or m.kind == "room" or m.kind == "undefined" then
+		nome = "Chat principal"
+	else
+		nome = tostring(m.kind) .. " " .. tostring(m.groupId or m.channelId or m.user2 or "")
+	end
+	return chave, nome
+end
+
+return info

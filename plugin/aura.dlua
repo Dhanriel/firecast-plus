@@ -1,0 +1,141 @@
+require("firecast.lua")
+require("scene.lua")
+require("ndb.lua")
+require("internet.lua")
+require("fireDrive.lua")
+local UI = require("ui.dlua")
+local novo = UI.novo
+
+-- Aura animada no token: uma camada atras dele com um GIF de chamas branco (gerar_aura.py), que o mapa
+-- tinge com colorMask. O GIF vai uma vez para o FireDrive de quem aplica, para todos verem mesmo sem o plugin.
+local aura = {}
+
+local CAMADA = "fcplusAura"
+local ARQUIVO = "chamas.gif"
+local VERSAO = "v2" -- mudar ao gerar o GIF de novo, para ele subir de novo ao FireDrive
+-- medidas do GIF (TOKEN_* e W, H em gerar_aura.py)
+local TOKEN_CX, TOKEN_CY, TOKEN_R, ASPECTO = 0.5, 0.68, 0.17, 400 / 256
+local TAMANHOS = {["1"] = 0.8, ["2"] = 1.0, ["3"] = 1.25, ["4"] = 1.5}
+local FORCAS = {["1"] = 0.5, ["2"] = 0.75, ["3"] = 1.0}
+
+local cfg = NDB.load("aura.xml")
+
+local function cor6(c)
+	c = tostring(c or "")
+	if c:match("^#%x%x%x%x%x%x") then return c:sub(1, 7):upper() end
+	return "#A040FF"
+end
+
+local function removerCamadas(token)
+	for _ = 1, 10 do -- mais de uma camada so se dois mestres aplicaram ao mesmo tempo
+		local op = token.canvas:findByName(CAMADA)
+		if op == nil then break end
+		op:delete()
+	end
+end
+
+-- desfaz o brilho da versao anterior da aura (glow na propria imagem)
+local function limparVersaoAntiga(token)
+	local ud = token.userData
+	if ud.fcplusAuraFrame ~= nil then
+		token.image.filterEx = "none"
+		token.image.frame = ud.fcplusAuraFrame
+		ud.fcplusAuraFrame = nil
+	end
+end
+
+-- link publico do GIF; sobe para o FireDrive na primeira vez e guarda
+function aura.hospedar(callback)
+	local chave = "url_" .. VERSAO
+	if cfg[chave] ~= nil then return callback(cfg[chave]) end
+	Internet.download("plugin://momotoro.firecast.plus/auras/" .. ARQUIVO,
+		function(stream)
+			FireDrive.uploadFile("/fcplus_aura_" .. VERSAO .. "_" .. ARQUIVO, stream,
+				function(item)
+					cfg[chave] = item.url
+					callback(item.url)
+				end, nil,
+				function(motivo) callback(nil, "FireDrive recusou o envio: " .. tostring(motivo)) end)
+		end,
+		function(erro) callback(nil, "Nao consegui ler o GIF do plugin: " .. tostring(erro)) end)
+end
+
+-- opcoes: {ligada=bool, cor="#RRGGBB", tamanho="1".."4", forca="1".."3", url="https://..."}
+function aura.aplicar(scene, token, o)
+	local ud = token.userData
+	limparVersaoAntiga(token)
+	removerCamadas(token)
+	local url = tostring(o.url or "")
+	if not o.ligada or not url:match("^https?://") then -- so link publico (veio de outro jogador pela rede)
+		ud.fcplusAura = "0"
+	else
+		local img = token.image
+		local cor = cor6(o.cor)
+		local escala = TAMANHOS[tostring(o.tamanho)] or TAMANHOS["2"]
+		local op = token.canvas:addBitmap()
+		op.name = CAMADA
+		op.url = url
+		op.width = img.width / (2 * TOKEN_R) * escala -- no tamanho Media o buraco do GIF tem o tamanho do token
+		op.height = op.width * ASPECTO
+		op.x = img.x + img.width / 2 - op.width * TOKEN_CX
+		op.y = img.y + img.height / 2 - op.height * TOKEN_CY
+		op.colorMask = cor
+		op.opacity = FORCAS[tostring(o.forca)] or FORCAS["2"]
+		op.outOfOrderMode = "beforeOwnerLayer" -- desenha atras do token
+
+		ud.fcplusAura = "1"
+		ud.fcplusAuraCor, ud.fcplusAuraTam, ud.fcplusAuraForca = cor, tostring(o.tamanho), tostring(o.forca)
+	end
+	pcall(function() scene:sendDelayedUpdates() end)
+end
+
+-- estado atual da aura do token, para abrir a janela com os valores certos
+function aura.ler(token)
+	local ud = token.userData or {}
+	return {ligada = tostring(ud.fcplusAura) == "1", cor = ud.fcplusAuraCor or "#A040FF",
+		tamanho = ud.fcplusAuraTam or "2", forca = ud.fcplusAuraForca or "2"}
+end
+
+-- janela; ao confirmar chama aoAplicar(opcoes) ja com o link publico do GIF em opcoes.url
+function aura.abrir(token, aoAplicar)
+	local o = aura.ler(token)
+	local frm, fundo = UI.janela("frmFCPlusAura", "Aura do token", 320, 300)
+
+	local function linha(rotulo)
+		local l = novo("layout", fundo, {align = "top", height = 32, margins = {top = 4}})
+		novo("label", l, {align = "left", width = 90, text = rotulo, fontColor = "white"})
+		return l
+	end
+	local cor = novo("colorComboBox", linha("Cor"), {align = "client", useAlpha = false, color = o.cor})
+	local tam = novo("comboBox", linha("Tamanho"), {align = "client", items = {"Pequena", "Média", "Grande", "Enorme"},
+		values = {"1", "2", "3", "4"}, value = o.tamanho})
+	local forca = novo("comboBox", linha("Intensidade"), {align = "client", items = {"Fraca", "Média", "Forte"},
+		values = {"1", "2", "3"}, value = o.forca})
+	local status = novo("label", fundo, {align = "top", height = 34, wordWrap = true, fontColor = "#BBBBBB", fontSize = 11,
+		margins = {top = 6}, text = "A aura fica atrás do token. Na primeira vez, o GIF vai para o seu FireDrive."})
+
+	local botoes = novo("layout", fundo, {align = "bottom", height = 34})
+	local btnAplicar = novo("button", botoes, {align = "right", width = 110, text = "Aplicar"})
+	local btnRemover = novo("button", botoes, {align = "left", width = 110, text = "Remover aura"})
+	btnAplicar:addEventListener("onClick", function()
+		local opcoes = {ligada = true, cor = cor.color, tamanho = tam.value, forca = forca.value}
+		status.text = "Preparando a aura..."
+		aura.hospedar(function(url, erro)
+			if url == nil then
+				status.text = erro
+				return
+			end
+			opcoes.url = url
+			aoAplicar(opcoes)
+			frm:close()
+		end)
+	end)
+	btnRemover:addEventListener("onClick", function()
+		aoAplicar({ligada = false})
+		frm:close()
+	end)
+	frm:endUpdate()
+	frm:show()
+end
+
+return aura

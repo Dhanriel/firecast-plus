@@ -1,0 +1,11 @@
+dist/
+__pycache__/
+*.pyc
+fcplus.log
+trailer3/build/
+trailer3/render/
+trailer3/assets/
+trailer3/.venv*/
+trailer3/modelos/kokoro/
+*.log
+*.wav
