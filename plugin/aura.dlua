@@ -6,15 +6,15 @@ require("fireDrive.lua")
 local UI = require("ui.dlua")
 local novo = UI.novo
 
--- Aura animada no token: uma camada atras dele com um GIF de chamas branco (gerar_aura.py), que o mapa
+-- Aura animada no token: uma camada atras dele com um GIF branco de aneis de luz (gerar_aura.py), que o mapa
 -- tinge com colorMask. O GIF vai uma vez para o FireDrive de quem aplica, para todos verem mesmo sem o plugin.
 local aura = {}
 
 local CAMADA = "fcplusAura"
-local ARQUIVO = "chamas.gif"
-local VERSAO = "v2" -- mudar ao gerar o GIF de novo, para ele subir de novo ao FireDrive
+local ARQUIVO = "luz.gif"
+local VERSAO = "v3" -- mudar ao gerar o GIF de novo, para ele subir de novo ao FireDrive
 -- medidas do GIF (TOKEN_* e W, H em gerar_aura.py)
-local TOKEN_CX, TOKEN_CY, TOKEN_R, ASPECTO = 0.5, 0.68, 0.17, 400 / 256
+local TOKEN_CX, TOKEN_CY, TOKEN_R, ASPECTO = 0.5, 0.5, 0.2, 1
 local TAMANHOS = {["1"] = 0.8, ["2"] = 1.0, ["3"] = 1.25, ["4"] = 1.5}
 local FORCAS = {["1"] = 0.5, ["2"] = 0.75, ["3"] = 1.0}
 

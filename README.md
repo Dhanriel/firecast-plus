@@ -3,7 +3,7 @@
 Plugin + ajudante para o **RRPG Firecast 8**: mais funções, skins de cores, aura animada nos tokens e mais.
 Usa só o SDK oficial de plugins e arquivos locais. Não mexe no protocolo nem no servidor.
 
-![Aura animada atrás do token](docs/aura.gif)
+![Aura animada em volta do token](docs/aura.gif)
 
 ## Instalar
 
@@ -66,7 +66,7 @@ ela sai do projeto.
 | `/timer segundos [texto]` | lembrete que só você vê |
 | Mapa > Firecast Plus > **Meu token** | cria o seu token (avatar e nick) onde você clicar. Um por pessoa |
 | Mapa > Firecast Plus > **Remover meu token** | remove o token criado pelo plugin |
-| Mapa > Firecast Plus > **Aura** | aura animada em chamas atrás do token selecionado, com cor, tamanho e intensidade. Todos veem, até quem não tem o plugin |
+| Mapa > Firecast Plus > **Aura** | aura animada de luz (aro brilhante, runas girando e faíscas) em volta do token selecionado, com cor, tamanho e intensidade. Todos veem, até quem não tem o plugin |
 
 **Token e aura:**
 - O jogador só mexe no próprio token. O mestre mexe em qualquer um.
