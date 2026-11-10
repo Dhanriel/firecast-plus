@@ -44,25 +44,37 @@ def original():
     return BAK if os.path.exists(BAK) else RES
 
 
+def arquivos_do_firecast():
+    """SDK Lua e som de mencao, tirados do Firecast instalado: nada do Firecast vai no repositorio nem no download.
+    O instalar.ps1 faz o mesmo no PC de quem instala."""
+    out = {}
+    with zipfile.ZipFile(original()) as res:
+        out["sons/highlight.mp3"] = res.read("sons/highlight.mp3")
+        # o Firecast nao fornece o SDK Lua aos plugins: todo .rpk leva sdk/ e a tabela de textos de um plugin padrao
+        with zipfile.ZipFile(res.open("complementosPadroes/AutoUpdater.rpk")) as au:
+            for n in au.namelist():
+                if n.startswith("sdk/") or n == "_rdkCompiledLang.cln":
+                    out[n] = au.read(n)
+    return out
+
+
 def build_plugin(instalar=True):
+    """instalar=False monta so a base (o que vai no download); senao completa com o Firecast daqui e instala."""
     src = os.path.join(HERE, "plugin")
-    xml = open(os.path.join(src, "module.xml"), encoding="utf-8").read()
-    pid = re.search(r"<id>(.+?)</id>", xml).group(1)
     files = {}
     for root, _, names in os.walk(src):
         for n in names:
             p = os.path.join(root, n)
             files[os.path.relpath(p, src).replace("\\", "/")] = open(p, "rb").read()
-    # o Firecast nao fornece o SDK Lua: todo .rpk leva sdk/ e a tabela de textos; copiados de um plugin padrao
-    with zipfile.ZipFile(original()) as res, zipfile.ZipFile(res.open("complementosPadroes/AutoUpdater.rpk")) as au:
-        for n in au.namelist():
-            if n.startswith("sdk/") or n == "_rdkCompiledLang.cln":
-                files[n] = au.read(n)
-    digest = hashlib.sha1(b"".join(files[k] for k in sorted(files))).hexdigest()
-    attrs = f' compilationDate="{time.strftime("%d%m%Y%H%M%S")}" compilationDigest="{digest}" compilationUniqueID="{secrets.token_hex(12)}"'
-    files["module.xml"] = xml.replace("<module ", "<module" + attrs + " ", 1).encode("utf-8")
+    xml = files["module.xml"].decode("utf-8")
+    pid = re.search(r"<id>(.+?)</id>", xml).group(1)
     os.makedirs(os.path.join(HERE, "dist"), exist_ok=True)
     out = os.path.join(HERE, "dist", pid + ".rpk")
+    if instalar:
+        files.update(arquivos_do_firecast())
+        digest = hashlib.sha1(b"".join(files[k] for k in sorted(files))).hexdigest()
+        attrs = f' compilationDate="{time.strftime("%d%m%Y%H%M%S")}" compilationDigest="{digest}" compilationUniqueID="{secrets.token_hex(12)}"'
+        files["module.xml"] = xml.replace("<module ", "<module" + attrs + " ", 1).encode("utf-8")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
         for k, v in files.items():
             z.writestr(k, v)
@@ -82,7 +94,7 @@ def pacote():
     versao = re.search(r"<version>(.+?)</version>", open(os.path.join(HERE, "plugin", "module.xml"), encoding="utf-8").read()).group(1)
     out = os.path.join(HERE, "dist", f"FirecastPlus-{versao}.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "fcplus.py", "Firecast Plus.pyw", "README.md", "LICENSE",
+        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "instalar.ps1", "fcplus.py", "Firecast Plus.pyw", "README.md", "LICENSE",
                   "skins/roxo.json"):
             z.write(os.path.join(HERE, n), "FirecastPlus/" + n)
     print("pacote:", out)

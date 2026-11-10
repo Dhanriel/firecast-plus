@@ -9,9 +9,12 @@ Usa só o SDK oficial de plugins e arquivos locais. Não mexe no protocolo nem n
 
 1. Baixe o `FirecastPlus-<versão>.zip` na página **Releases** e extraia.
 2. Feche o Firecast (inclusive o ícone perto do relógio).
-3. Dê dois cliques em `instalar.bat`. Ele copia o plugin para `%APPDATA%\Firecast\Plugins`.
-4. O instalador pergunta se você quer o **ajudante**, que exige Python 3. Se responder sim, ele cria o atalho
+3. Dê dois cliques em `instalar.bat`. Ele completa o plugin com arquivos do seu próprio Firecast (o SDK e o som de
+   menção) e o instala em `%APPDATA%\Firecast\Plugins`.
+4. O instalador pergunta se você quer o **ajudante**, que usa Python 3. Se responder sim, ele cria o atalho
    **Firecast Plus** na área de trabalho. Abra o Firecast sempre por esse atalho.
+   Se o Python não estiver instalado, o instalador oferece baixar o Python 3.12 do python.org (só para o seu usuário,
+   uns 25 MB). Ele confere a assinatura digital da Python Software Foundation antes de instalar.
 
 O ajudante é necessário para:
 - trocar as cores e a fonte do Firecast e aumentar o texto do chat;
@@ -80,5 +83,5 @@ python check_lua.py        sintaxe de todos os .lua/.dlua do plugin
 
 ## Licença
 
-MIT (veja `LICENSE`). Os arquivos do SDK do Firecast que vão dentro do `.rpk` e o som `plugin/sons/highlight.mp3`
-são do Grupo RRPG Firecast e não entram na licença.
+MIT (veja `LICENSE`). O repositório e o download não trazem nenhum arquivo do Firecast: na instalação, o
+`instalar.ps1` copia do Firecast já instalado no PC o SDK Lua (que todo plugin precisa levar) e o som de menção.

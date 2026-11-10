@@ -27,6 +27,26 @@ assert b"\x06\x08fontSize\x06\x0218" in x2[i:i + 2000]  # 14 + 4
 s2 = fcplus.fontes_style(sty, "Comic Sans MS")
 assert fcplus.fontes_style(s2, None) == s2 and b"Roboto" not in s2 and b"Lato" not in s2
 
+# instalador: a base (o download) nao tem nada do Firecast; o instalar.ps1 completa e chega ao mesmo plugin do Python
+import hashlib, os, subprocess, tempfile as _t
+
+base = fcplus.build_plugin(instalar=False)
+with _z.ZipFile(base) as z:
+    nomes_base = set(z.namelist())
+assert not any(n.startswith("sdk/") or n.startswith("sons/") or n == "_rdkCompiledLang.cln" for n in nomes_base)
+esperado = {n: d for n, d in fcplus.arquivos_do_firecast().items()}
+with _z.ZipFile(base) as z:
+    esperado.update({n: z.read(n) for n in z.namelist()})
+digest = hashlib.sha1(b"".join(esperado[k] for k in sorted(esperado))).hexdigest()
+saida = os.path.join(_t.mkdtemp(), "p.rpk")
+r = subprocess.run(["powershell", "-NoProfile", "-ExecutionPolicy", "Bypass", "-File", os.path.join(fcplus.HERE, "instalar.ps1"),
+                    "-Base", base, "-Destino", saida], capture_output=True, text=True)
+assert r.returncode == 0, r.stderr
+with _z.ZipFile(saida) as z:
+    assert set(z.namelist()) == set(esperado)
+    assert all(z.read(n) == d for n, d in esperado.items() if n != "module.xml")
+    assert f'compilationDigest="{digest}"' in z.read("module.xml").decode()
+
 # atualizacao do Firecast: numa copia, o resource.zip muda -> vira o novo original e a skin volta sozinha
 import os, shutil, tempfile, zipfile
 

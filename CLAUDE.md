@@ -13,6 +13,9 @@ Regras do projeto:
   - um `module.xml` com `compilationDate`, `compilationDigest` (sha1 dos arquivos) e `compilationUniqueID`.
 - Os `.lua` da raiz rodam ao carregar. Os módulos usam `.dlua` e só rodam via `require`.
 - Não há `.lfm` compilado: as janelas são montadas em Lua puro com `ui.dlua` (`ui.novo`, `ui.janela`).
+- Nenhum arquivo do Firecast vai no repositório nem no download (Termos 4.2a). `fcplus.py pacote` leva só a base
+  (`build_plugin(instalar=False)`); o `instalar.ps1` completa no PC do usuário com o SDK e `sons/highlight.mp3` do
+  `resource.zip` e calcula o mesmo `compilationDigest`. O `test_fcplus.py` compara os dois caminhos.
 - A instalação copia o arquivo para `%APPDATA%\Firecast\Plugins\momotoro.firecast.plus.rpk`. O Firecast **trava o .rpk aberto**: feche e espere o processo sair antes de copiar.
 - Os dados do plugin (`NDB.load`, `VHD.openFile`) ficam em `%APPDATA%\Firecast\Plugins\momotoro.firecast.plus_vhd\`.
 - Para validar sem o Firecast: `check_lua.py` compila com a `lua54x64.dll` do Firecast, e `test_modulos.py` executa os autotestes dos módulos com o SDK simulado.
