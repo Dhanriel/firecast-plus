@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="UTF-8"?>
 <module sdkVersion="3.7b" originalPluginFileName="FirecastPlus.rpk" sdkApiVersion="88" sdkMinorApiVersion="2">
 	<id>momotoro.firecast.plus</id>
-	<version>1.2.0</version>
+	<version>1.2.1</version>
 	<info lang="pt-BR">
 		<name>Firecast Plus</name>
 		<description>Skins de cores e fonte, aura animada nos tokens, rastreador de turno, beep por palavra, prévia de links e comandos extras. Use /fc para ver a lista.</description>

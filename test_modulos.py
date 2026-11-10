@@ -25,3 +25,23 @@ for nome in ("previa.dlua", "turno.dlua"):
     if r != 0:
         sys.exit("FALHOU: " + lua.lua_tolstring(L, -1, None).decode("utf-8", "replace"))
     print("ok", nome)
+
+# ui.escrever com o arquivo preso (ajudante ou antivirus lendo, como no PC de um jogador): devolve false, sem erro
+TESTE_UI = b"""
+local preso = false
+VHD = {fileExists = function() return true end,
+       deleteFile = function() if preso then error("Acesso negado [piscar.txt]") end end,
+       openFile = function() return {write = function() end, close = function() end} end}
+require = function(n) if n == "utils.lua" then return {binaryEncode = function(b, _, t) return #t end} end return {} end
+local ui = load(UI_SRC, "@ui.dlua")()
+assert(ui.escrever("piscar.txt", "1") == true)
+preso = true
+assert(ui.escrever("piscar.txt", "1") == false)
+"""
+L = lua.luaL_newstate()
+lua.luaL_openlibs(L)
+src = b"UI_SRC = [==[" + open("plugin/ui.dlua", "rb").read() + b"]==]\n" + TESTE_UI
+r = lua.luaL_loadbufferx(L, src, len(src), b"@teste_ui", b"t") or lua.lua_pcallk(L, 0, 0, 0, 0, None)
+if r != 0:
+    sys.exit("FALHOU: " + lua.lua_tolstring(L, -1, None).decode("utf-8", "replace"))
+print("ok ui.dlua")

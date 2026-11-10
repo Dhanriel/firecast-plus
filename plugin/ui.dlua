@@ -5,14 +5,17 @@ local Utils = require("utils.lua")
 -- helpers para montar janelas em Lua puro (sem .lfm compilado pelo rdk) e falar com o ajudante
 local ui = {}
 
--- grava um arquivo na pasta do plugin (%APPDATA%\Firecast\Plugins\momotoro.firecast.plus_vhd), que o ajudante le
+-- grava um arquivo na pasta do plugin (%APPDATA%\Firecast\Plugins\momotoro.firecast.plus_vhd), que o ajudante le.
+-- Devolve false se o arquivo estiver preso (o ajudante ou um antivirus lendo naquele instante): sem janela de erro.
 function ui.escrever(nome, texto)
-	if VHD.fileExists(nome) then VHD.deleteFile(nome) end
-	local f = VHD.openFile(nome, "w")
-	local buf = {}
-	local n = Utils.binaryEncode(buf, "utf8", texto)
-	f:write(buf, n)
-	f:close()
+	return (pcall(function()
+		if VHD.fileExists(nome) then VHD.deleteFile(nome) end
+		local f = VHD.openFile(nome, "w")
+		local buf = {}
+		local n = Utils.binaryEncode(buf, "utf8", texto)
+		f:write(buf, n)
+		f:close()
+	end))
 end
 
 function ui.novo(tipo, pai, props)

@@ -86,12 +86,15 @@ local function construir()
 	local btnOriginal = novo("button", botoes, {align = "left", width = 140, text = "Restaurar original"})
 
 	local function pedir(json)
-		UI.escrever("pedido.json", json)
+		if not UI.escrever("pedido.json", json) then
+			status.text = "Não consegui gravar o pedido. Tente de novo."
+			return
+		end
 		status.text = "Reiniciando o Firecast..."
 		-- o ajudante apaga o pedido ao ler; se continuar la, ele nao esta rodando
 		setTimeout(function()
 			if VHD.fileExists("pedido.json") then
-				VHD.deleteFile("pedido.json")
+				pcall(VHD.deleteFile, "pedido.json")
 				status.text = "Ajudante fechado: abra pelo 'Firecast Plus.pyw'."
 			end
 		end, 4000)
