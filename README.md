@@ -25,7 +25,7 @@ As outras funções funcionam só com o plugin.
 As funções do plugin usam só o SDK oficial, que os Termos do Firecast autorizam (item 12.3c).
 
 A troca de **cores, fonte e tamanho do chat** é diferente: o ajudante reescreve, no seu PC, o arquivo de tema
-`%LOCALAPPDATA%\Firecastesource.zip`. Ele não altera o `Firecast.exe`, o protocolo, o servidor nem o login, guarda
+`%LOCALAPPDATA%\Firecast\resource.zip`. Ele não altera o `Firecast.exe`, o protocolo, o servidor nem o login, guarda
 um backup do original e volta tudo com **Restaurar original** (ou `python fcplus.py restaurar`).
 Mesmo assim, o item 4.2(c) dos Termos proíbe "utilizar qualquer software Firecast não autorizados ou modificados", e
 não há autorização expressa para esse tipo de personalização. Por isso ela é **opcional**: só funciona com o ajudante

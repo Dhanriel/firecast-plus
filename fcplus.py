@@ -82,7 +82,7 @@ def pacote():
     versao = re.search(r"<version>(.+?)</version>", open(os.path.join(HERE, "plugin", "module.xml"), encoding="utf-8").read()).group(1)
     out = os.path.join(HERE, "dist", f"FirecastPlus-{versao}.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "fcplus.py", "Firecast Plus.pyw", "README.md",
+        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "fcplus.py", "Firecast Plus.pyw", "README.md", "LICENSE",
                   "skins/roxo.json"):
             z.write(os.path.join(HERE, n), "FirecastPlus/" + n)
     print("pacote:", out)
