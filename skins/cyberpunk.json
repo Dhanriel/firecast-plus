@@ -1,0 +1,27 @@
+{
+ "nome": "Cyberpunk",
+ "base": {"destaque": "#C5003C", "fundo": "#000000", "texto": "#B8F6ED"},
+ "fonte": "Bahnschrift",
+ "cores": {
+  "alt1_card_color": "#880425",
+  "alt2_card_color": "#C5003C",
+  "alt3_card_color": "#0F7F73",
+  "alt4_card_color": "#7A7400",
+  "preponent_color_background_regular_text_contrasted": "#0F8F80",
+  "online_state_color": "#55EAD4",
+  "color18": "#C5003C",
+  "color23": "#C5003C",
+  "yellow_warning_color": "#F3E600",
+  "premium_gold_color": "#F3E600",
+  "emoji_face_color": "#F3E600"
+ },
+ "arquivos": {
+  "themes/flat/frames/disconnectedForm/backgrounds/bkg1.jpg": "cyberpunk/login1.jpg",
+  "themes/flat/frames/disconnectedForm/backgrounds/bkg2.jpg": "cyberpunk/login2.jpg",
+  "themes/flat/frames/disconnectedForm/backgrounds/bkg3.jpg": "cyberpunk/login1.jpg",
+  "themes/flat/frames/disconnectedForm/backgrounds/bkg4.jpg": "cyberpunk/login2.jpg",
+  "themes/flat/frames/chat/fcplus_chat.png": "cyberpunk/chat.png",
+  "themes/flat/frames/chat/logRichEdit.xml": "cyberpunk/logRichEdit.xml",
+  "precompiled/themes/flat/frames/chat/logRichEdit.xml": null
+ }
+}

@@ -10,6 +10,8 @@ tasklist /FI "IMAGENAME eq Firecast.exe" /NH | find /I "Firecast.exe" >nul && (
   echo Feche o Firecast ^(inclusive o icone perto do relogio^) e rode de novo.
   pause & exit /b 1
 )
+rem um ajudante de uma versao anterior ainda aberto continuaria rodando o codigo antigo: fecha (o atalho abre o novo)
+powershell -NoProfile -Command "Get-CimInstance Win32_Process | Where-Object { $_.Name -eq 'pythonw.exe' -and $_.CommandLine -like '*Firecast Plus.pyw*' } | ForEach-Object { Stop-Process -Id $_.ProcessId -Force }" >nul 2>nul
 if not exist "%APPDATA%\Firecast\Plugins" mkdir "%APPDATA%\Firecast\Plugins"
 rem o download nao leva arquivos do Firecast: o instalar.ps1 completa o plugin com o SDK e o som do Firecast deste PC
 powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0instalar.ps1" -Base "dist\momotoro.firecast.plus.rpk" -Destino "%APPDATA%\Firecast\Plugins\momotoro.firecast.plus.rpk" >nul || (

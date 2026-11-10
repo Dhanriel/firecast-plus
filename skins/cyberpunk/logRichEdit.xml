@@ -1,0 +1,15 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<frame width="302" height="270"  >
+	<import file="../../consts.xml"/>
+	<draw>
+		<!-- skin Cyberpunk: circuito lado a lado atras das mensagens e uma linha amarela no topo -->
+		<image left="0" top="0" right="302" bottom="270" zOrder="-20" overflowX="tile" overflowY="tile">
+			<anchors left="true" top="true" bottom="true" right="true"/>
+			<source url="fcplus_chat.png" left="0" top="0" right="512" bottom="512"/>
+		</image>
+		<rectangle left="0" top="0" right="302" bottom="2" xradius="0" yradius="0" zOrder="-10">
+			<anchors left="true" top="true" bottom="false" right="true"/>
+			<fill color="#F3E600" kind="solid" opacity="0.85"/>
+		</rectangle>
+	</draw>
+</frame>

@@ -30,6 +30,22 @@ Regras do projeto:
   inteiro (paleta, depois classes: nome, nome, atributos próprios, atributos herdados, pais) e troca Roboto/Lato e o
   `fontSize` de `logRichEditStyle`/`chatInputRichEditStyle`. `fontes_style` refaz o índice (nome, tamanho) dos `.style`.
   Sem troca, os dois devolvem o arquivo idêntico, e o `test_fcplus.py` confere isso.
+- **Arquivos da skin** (`arquivos` no JSON; `skins/cyberpunk.json` é o exemplo):
+  - As entradas do `resource.zip` são guardadas **sem compressão**; os arquivos novos entram igual (`ZipInfo`).
+  - 57 frames de `themes/` não têm versão em `precompiled/`, e o Firecast os lê do XML. Para trocar um frame, a skin
+    põe o XML em `themes/...` e apaga o precompilado dele.
+  - Num frame, `<image overflowX/overflowY>` aceita `none`, `tile`, `stretch`, `center` e `9slice`, e o `<source url>` é
+    relativo à pasta do frame. Imagens também entram por atributo de classe (os `backImage0..3` da tela de login).
+  - **Visto no Firecast (10/11/2026):** o `<image>` aceita PNG com transparência em `tile`, e o JPG da tela de login troca.
+  - O Firecast guarda o frame lido do XML num cache amarrado ao `.cache_hash` do zip. Sem trocar o hash, ele reusa o
+    frame antigo (a linha do chat ficou da cor da skin anterior). Por isso `aplicar` grava um hash novo quando há arquivos.
+  - O `colorComboBox` devolve nome nas cores com nome (`Black`, `White`); `_hex` converte.
+- **Editor de Skins** (`editor_skins.py`, tkinter, só stdlib): o estado da janela vai junto no JSON (`editor`), e
+  `montar()` gera uma skin no mesmo formato da Cyberpunk. Secundária e realce viram chaves da paleta em
+  `cores_extras`. O fundo do chat ganha um véu da cor de fundo (`opacity` = 1 - força). O Tk não mostra JPG, então
+  a prévia só desenha imagem PNG. A tela de login só aceita JPG porque as entradas se chamam `bkgN.jpg`.
+- O texto dos botões usa a mesma cor do texto geral (a troca é por valor), então o destaque tem de ser escuro o
+  bastante para texto claro. Por isso, na Cyberpunk, o destaque é o vermelho, e o amarelo fica nos detalhes.
 - O Firecast trava o `resource.zip` enquanto roda, e o tema só é lido na abertura. **Não existe troca de cores ao vivo nem por mesa.**
 
 ## Fluxo plugin -> ajudante
@@ -38,6 +54,8 @@ O plugin não reinicia o Firecast nem chama APIs do Windows, então escreve arqu
 - `piscar.txt` (função piscar): o ajudante chama `FlashWindowEx` na janela do Firecast quando ela não está em foco. A janela Delphi tem dono e `WS_EX_APPWINDOW`.
 - Se o pedido continuar lá depois de 4 s, a janela avisa que o ajudante está fechado.
 - Os erros do ajudante vão para `fcplus.log`, porque ele roda com pythonw, sem console.
+- O ajudante fica aberto por dias. Depois de mudar o `fcplus.py`, feche o `pythonw` antigo e abra de novo (o
+  `instalar.bat` fecha), senão ele segue com o código velho e ignora o que é novo no pedido.
 
 ## Logs
 Os erros de plugin ficam em `%LOCALAPPDATA%\Firecast\LogErrors\Firecast-debugLog.txt`. Procure por `ELuaAtPanic` ou `momotoro`. Os ícones carregados aparecem como `plugin://momotoro.firecast.plus/...`, o que prova que o plugin carregou.

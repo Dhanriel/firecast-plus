@@ -14,10 +14,12 @@ local PRESETS = {
 	{"Azul", "#2D8CFF", "#15202B", "#E8F0F8"},
 	{"Verde", "#2FBF71", "#141E18", "#EEF5EF"},
 	{"Âmbar", "#F5A623", "#1E1A14", "#F5EFE6"},
+	-- o quinto campo e uma skin da pasta skins/ do ajudante (cores extras e imagens); o sexto, a fonte que combina
+	{"Cyberpunk", "#C5003C", "#000000", "#B8F6ED", "cyberpunk", "Bahnschrift"},
 }
 
 -- fontes que vem com o Windows; Roboto e a do tema
-local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS"}
+local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS", "Bahnschrift"}
 local TAMANHOS = {{"Normal", "14"}, {"Grande", "16"}, {"Maior", "18"}, {"Enorme", "21"}}
 
 local cfg = NDB.load("cores.xml")
@@ -61,13 +63,24 @@ local function construir()
 		atualizarPrevia()
 	end
 
+	local status = novo("label", fundo, {align = "bottom", height = 22, fontColor = "#BBBBBB", fontSize = 11})
+	local skin = cfg.skin  -- skin do ultimo preset escolhido; nil = so as cores da janela
+	local function avisarSkin()
+		status.text = skin and "Cyberpunk: também põe imagens no chat e na tela de login." or ""
+	end
+	avisarSkin()
+
 	local linhaPresets = novo("flowLayout", fundo, {align = "top", height = 64, margins = {top = 10}})
 	for _, p in ipairs(PRESETS) do
-		local b = novo("button", linhaPresets, {width = 62, height = 28, text = p[1], margins = {right = 4, bottom = 4}})
-		b:addEventListener("onClick", function() usar(p[2], p[3], p[4]) end)
+		local b = novo("button", linhaPresets, {width = p[5] and 90 or 62, height = 28, text = p[1], margins = {right = 4, bottom = 4}})
+		b:addEventListener("onClick", function()
+			if p[6] then fonte.value = p[6] end
+			usar(p[2], p[3], p[4])
+			skin = p[5]
+			avisarSkin()
+		end)
 	end
 
-	local status = novo("label", fundo, {align = "bottom", height = 22, fontColor = "#BBBBBB", fontSize = 11})
 	local botoes = novo("layout", fundo, {align = "bottom", height = 34, margins = {bottom = 4}})
 	local btnAplicar = novo("button", botoes, {align = "right", width = 160, text = "Aplicar e reiniciar"})
 	local btnOriginal = novo("button", botoes, {align = "left", width = 140, text = "Restaurar original"})
@@ -86,13 +99,15 @@ local function construir()
 
 	btnAplicar:addEventListener("onClick", function()
 		cfg.destaque, cfg.fundo, cfg.texto = campos.destaque.color, campos.fundo.color, campos.texto.color
-		cfg.fonte, cfg.tamanho = fonte.value, tamanho.value
-		pedir(string.format('{"acao":"aplicar","destaque":"%s","fundo":"%s","texto":"%s","fonte":"%s","tamanho_chat":%d}',
-			tostring(cfg.destaque), tostring(cfg.fundo), tostring(cfg.texto), tostring(cfg.fonte), tonumber(cfg.tamanho) or 14))
+		cfg.fonte, cfg.tamanho, cfg.skin = fonte.value, tamanho.value, skin
+		pedir(string.format('{"acao":"aplicar","destaque":"%s","fundo":"%s","texto":"%s","fonte":"%s","tamanho_chat":%d%s}',
+			tostring(cfg.destaque), tostring(cfg.fundo), tostring(cfg.texto), tostring(cfg.fonte), tonumber(cfg.tamanho) or 14,
+			skin and (',"skin":"' .. skin .. '"') or ""))
 	end)
 	btnOriginal:addEventListener("onClick", function()
 		usar(PRESETS[1][2], PRESETS[1][3], PRESETS[1][4])
-		cfg.destaque, cfg.fundo, cfg.texto, cfg.fonte, cfg.tamanho = nil, nil, nil, nil, nil
+		skin = nil
+		cfg.destaque, cfg.fundo, cfg.texto, cfg.fonte, cfg.tamanho, cfg.skin = nil, nil, nil, nil, nil, nil
 		fonte.value, tamanho.value = FONTES[1], TAMANHOS[1][2]
 		pedir('{"acao":"restaurar"}')
 	end)

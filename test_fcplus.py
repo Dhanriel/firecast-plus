@@ -69,5 +69,46 @@ with zipfile.ZipFile(fcplus.RES) as z:
     assert "novo_na_versao.txt" in z.namelist()
     assert b"9F34EB" in z.read("precompiled/themes/flat/frames/buttons/actionButton.xml").upper()
 assert fcplus.verificar_atualizacao(False, lambda: True) == "ok"
+
+# skin com arquivos (Cyberpunk), do jeito que a janela /cores pede: cores da janela + cores extras e arquivos da skin
+import xml.dom.minidom
+
+cfg = fcplus.cfg_do_pedido({"acao": "aplicar", "destaque": "#00FF00FF", "fundo": "#000000", "texto": "#B8F6ED",
+                            "fonte": "Roboto", "tamanho_chat": 14, "skin": "cyberpunk"})
+assert cfg["base"]["destaque"] == "#00FF00" and cfg["fonte"] == "Roboto" and cfg["cores"]["online_state_color"] == "#55EAD4"  # a base e a da janela
+fcplus.aplicar(cfg)
+skin_dir = os.path.join(fcplus.HERE, "skins", "cyberpunk")
+with zipfile.ZipFile(original_real) as z:
+    antes = set(z.namelist())
+with zipfile.ZipFile(fcplus.RES) as z:
+    nomes = z.namelist()
+    assert z.testzip() is None and len(nomes) == len(set(nomes))
+    assert all(i.compress_type == zipfile.ZIP_STORED for i in z.infolist())  # o Firecast guarda tudo sem compressao
+    pre = "precompiled/themes/flat/frames/chat/logRichEdit.xml"  # sem o precompilado, o Firecast le o XML
+    assert set(nomes) == (antes | {"novo_na_versao.txt", "themes/flat/frames/chat/fcplus_chat.png"}) - {pre}
+    frame = xml.dom.minidom.parseString(z.read("themes/flat/frames/chat/logRichEdit.xml"))
+    fonte_img = frame.getElementsByTagName("image")[0].getElementsByTagName("source")[0].getAttribute("url")
+    assert z.read("themes/flat/frames/chat/" + fonte_img) == open(os.path.join(skin_dir, "chat.png"), "rb").read()
+    for i, n in enumerate(("login1", "login2", "login1", "login2"), 1):
+        assert z.read(f"themes/flat/frames/disconnectedForm/backgrounds/bkg{i}.jpg") == open(os.path.join(skin_dir, n + ".jpg"), "rb").read()
+    pal2 = fcplus.ler_paleta(z.read(fcplus.PALETA))
+    assert pal2["color1"] == "#00FF00" and pal2["online_state_color"] == "#55EAD4"
+    with zipfile.ZipFile(original_real) as zo:  # hash novo: senao o Firecast reusa o frame em cache
+        assert z.read(".cache_hash") != zo.read(".cache_hash") and len(z.read(".cache_hash")) == len(zo.read(".cache_hash"))
+assert fcplus.verificar_atualizacao(False, lambda: True) == "ok"
+shutil.copyfile(original_real, fcplus.RES)  # outra "atualizacao": a skin com arquivos tambem volta sozinha
+assert fcplus.verificar_atualizacao(False, lambda: True) == "reaplicada"
+with zipfile.ZipFile(fcplus.RES) as z:
+    assert "themes/flat/frames/chat/fcplus_chat.png" in z.namelist() and pre not in z.namelist()
+for ruim in ("../roxo", "Cyberpunk", "a b"):  # o nome da skin vira nome de arquivo
+    try:
+        fcplus.cfg_do_pedido({"skin": ruim})
+        raise AssertionError(ruim)
+    except ValueError:
+        pass
+assert "arquivos" not in fcplus.cfg_do_pedido({"destaque": "#112233"})
+# o seletor do Firecast manda nome em vez de hex nas cores com nome (o preto da Cyberpunk chegou como "Black")
+assert fcplus.cfg_do_pedido({"fundo": "Black", "texto": "White", "destaque": "#c5003cff"})["base"] == {
+    "destaque": "#C5003C", "fundo": "#000000", "texto": "#FFFFFF"}
 shutil.rmtree(tmp)
 print("ok", len(same), "cores; atualizacao reaplica a skin")

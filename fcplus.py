@@ -2,14 +2,14 @@
 
   python fcplus.py plugin            monta plugin/ em dist/ e instala em %APPDATA%\\Firecast\\Plugins
   python fcplus.py paleta            mostra as cores do tema original
-  python fcplus.py skin skins/X.json aplica uma skin (feche o Firecast antes)
+  python fcplus.py skin skins/X.json aplica uma skin, com cores e arquivos (feche o Firecast antes)
   python fcplus.py restaurar         volta o tema original
   python fcplus.py iniciar           abre o Firecast e fica ouvindo o plugin (cores e piscar)
   python fcplus.py piscar            pisca o Firecast na barra de tarefas (teste)
   python fcplus.py atalho            cria o atalho "Firecast Plus" na area de trabalho
   python fcplus.py pacote            monta o plugin e o zip de distribuicao em dist/
 """
-import colorsys, ctypes, hashlib, json, os, re, secrets, shutil, socket, struct, subprocess, sys, time, zipfile
+import codecs, colorsys, ctypes, hashlib, json, os, re, secrets, shutil, socket, struct, subprocess, sys, time, zipfile
 from ctypes import wintypes
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -94,9 +94,13 @@ def pacote():
     versao = re.search(r"<version>(.+?)</version>", open(os.path.join(HERE, "plugin", "module.xml"), encoding="utf-8").read()).group(1)
     out = os.path.join(HERE, "dist", f"FirecastPlus-{versao}.zip")
     with zipfile.ZipFile(out, "w", zipfile.ZIP_DEFLATED) as z:
-        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "instalar.ps1", "fcplus.py", "Firecast Plus.pyw", "README.md", "LICENSE",
-                  "skins/roxo.json"):
+        for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "instalar.ps1", "fcplus.py", "Firecast Plus.pyw",
+                  "editor_skins.py", "Editor de Skins.pyw", "README.md", "LICENSE"):
             z.write(os.path.join(HERE, n), "FirecastPlus/" + n)
+        for raiz, _, nomes in os.walk(os.path.join(HERE, "skins")):
+            for n in nomes:
+                p = os.path.join(raiz, n)
+                z.write(p, "FirecastPlus/" + os.path.relpath(p, HERE).replace("\\", "/"))
     print("pacote:", out)
 
 
@@ -284,6 +288,9 @@ def aplicar(cfg):
     if not 10 <= tam <= 40:
         sys.exit(f"tamanho do chat fora de 10..40: {tam}")
     delta = tam - TAMANHO_CHAT
+    # arquivos da skin: caminho dentro do resource.zip -> arquivo em skins/ (imagem ou frame em XML); None apaga a entrada.
+    # Um frame sem versao em precompiled/ e lido do XML pelo Firecast, entao a skin troca o XML e apaga o precompilado.
+    arquivos = cfg.get("arquivos") or {}
 
     # mesmo tamanho de texto, entao os arquivos binarios do Delphi continuam validos
     pat = re.compile(rb"(#|x[0-9A-Fa-f]{2})([0-9A-Fa-f]{6})")
@@ -294,12 +301,23 @@ def aplicar(cfg):
     tmp = RES + ".tmp"
     with zipfile.ZipFile(BAK) as zin, zipfile.ZipFile(tmp, "w", zipfile.ZIP_DEFLATED) as zout:
         for info in zin.infolist():
+            if info.filename in arquivos or (arquivos and info.filename == ".cache_hash"):
+                continue
             d = zin.read(info)
             if info.filename.startswith(TEMAS) and not info.filename.endswith((".png", ".jpg", ".ttf")):
                 d = pat.sub(sub, d)
                 if fonte or delta:
                     d = fontes(info.filename, d, fonte, delta)
             zout.writestr(info, d)
+        marca = hashlib.sha1()
+        for nome, origem in arquivos.items():
+            if origem:  # ZipInfo = sem compressao, como todas as entradas do resource.zip
+                d = open(os.path.join(HERE, "skins", origem), "rb").read()
+                marca.update(nome.encode() + d)
+                zout.writestr(zipfile.ZipInfo(nome), d)
+        if arquivos:
+            # o Firecast guarda os frames lidos do XML num cache amarrado a este hash: sem trocar, ele reusa o frame antigo
+            zout.writestr(zipfile.ZipInfo(".cache_hash"), codecs.BOM_UTF8 + marca.hexdigest().encode())
     try:
         os.replace(tmp, RES)
     except PermissionError:
@@ -366,14 +384,15 @@ def restaurar():
 
 
 def atalho():
-    """Cria o atalho "Firecast Plus" na area de trabalho: abre o Firecast junto com o ajudante."""
+    """Cria na area de trabalho os atalhos "Firecast Plus" (Firecast com o ajudante) e "Editor de Skins Firecast Plus"."""
     pyw = os.path.join(os.path.dirname(sys.executable), "pythonw.exe")
-    alvo = os.path.join(HERE, "Firecast Plus.pyw")
-    # shortcut: caminhos com aspas simples quebram o comando; trocar por arquivo .ps1 se aparecer o caso
-    ps = ("$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\Firecast Plus.lnk');"
-          f"$s.TargetPath='{pyw}';$s.Arguments='\"{alvo}\"';$s.WorkingDirectory='{HERE}';$s.IconLocation='{EXE},0';$s.Save()")
-    subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True)
-    print("atalho 'Firecast Plus' criado na area de trabalho")
+    for nome, script in (("Firecast Plus", "Firecast Plus.pyw"), ("Editor de Skins Firecast Plus", "Editor de Skins.pyw")):
+        alvo = os.path.join(HERE, script)
+        # shortcut: caminhos com aspas simples quebram o comando; trocar por arquivo .ps1 se aparecer o caso
+        ps = (f"$s=(New-Object -ComObject WScript.Shell).CreateShortcut([Environment]::GetFolderPath('Desktop')+'\\{nome}.lnk');"
+              f"$s.TargetPath='{pyw}';$s.Arguments='\"{alvo}\"';$s.WorkingDirectory='{HERE}';$s.IconLocation='{EXE},0';$s.Save()")
+        subprocess.run(["powershell", "-NoProfile", "-Command", ps], check=True)
+        print(f"atalho '{nome}' criado na area de trabalho")
 
 
 def firecast_aberto():
@@ -394,15 +413,38 @@ def fechar_firecast():
         time.sleep(0.5)
 
 
+def _hex(v):
+    """O seletor de cor do Firecast devolve #RRGGBB, #RRGGBBAA ou, nas cores com nome, o nome ("Black", "White")."""
+    if re.fullmatch(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", v):
+        return v[:7].upper()
+    import tkinter  # o Tk conhece os nomes de cor
+    tk = tkinter.Tk()
+    try:
+        return "#%02X%02X%02X" % tuple(c >> 8 for c in tk.winfo_rgb(v))
+    finally:
+        tk.destroy()
+
+
+def cfg_do_pedido(pedido):
+    """A janela /cores manda as tres cores, a fonte, o tamanho e, no preset Cyberpunk, o nome de uma skin de skins/.
+    Da skin vem as cores extras e os arquivos; a base, a fonte e o tamanho sao sempre os da janela."""
+    cfg = {"nome": "do plugin", "base": {k: _hex(pedido[k]) for k in FAMILIAS if k in pedido},
+           "fonte": pedido.get("fonte"), "tamanho_chat": pedido.get("tamanho_chat")}
+    nome = pedido.get("skin")
+    if nome:
+        if not re.fullmatch(r"[a-z0-9_]{1,30}", nome):  # vira nome de arquivo
+            raise ValueError(f"nome de skin invalido: {nome!r}")
+        cfg = {**json.load(open(os.path.join(HERE, "skins", nome + ".json"), encoding="utf-8")), **cfg}
+    return cfg
+
+
 def atender(pedido):
     fechar_firecast()
     try:
         if pedido.get("acao") == "restaurar":
             restaurar()
         else:
-            # o seletor de cor do Firecast devolve #RRGGBB ou #RRGGBBAA
-            aplicar({"nome": "do plugin", "base": {k: pedido[k][:7].upper() for k in FAMILIAS if k in pedido},
-                     "fonte": pedido.get("fonte"), "tamanho_chat": pedido.get("tamanho_chat")})
+            aplicar(cfg_do_pedido(pedido))
         log(f"ok: {pedido}")
     except (Exception, SystemExit) as e:
         log(f"erro em {pedido}: {e}")
