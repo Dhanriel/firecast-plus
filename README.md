@@ -20,6 +20,18 @@ O ajudante é necessário para:
 
 As outras funções funcionam só com o plugin.
 
+## Personalização visual e Termos de Uso
+
+As funções do plugin usam só o SDK oficial, que os Termos do Firecast autorizam (item 12.3c).
+
+A troca de **cores, fonte e tamanho do chat** é diferente: o ajudante reescreve, no seu PC, o arquivo de tema
+`%LOCALAPPDATA%\Firecastesource.zip`. Ele não altera o `Firecast.exe`, o protocolo, o servidor nem o login, guarda
+um backup do original e volta tudo com **Restaurar original** (ou `python fcplus.py restaurar`).
+Mesmo assim, o item 4.2(c) dos Termos proíbe "utilizar qualquer software Firecast não autorizados ou modificados", e
+não há autorização expressa para esse tipo de personalização. Por isso ela é **opcional**: só funciona com o ajudante
+instalado, e o resto do plugin não depende dela. Use por sua conta. Se o Grupo RRPG Firecast se manifestar contra,
+ela sai do projeto.
+
 ## Comandos e botões
 
 | Onde | O quê |
@@ -65,3 +77,8 @@ python test_fcplus.py      skins e reaplicação após atualização (numa cópi
 python test_modulos.py     autotestes da prévia de links e do turno, na Lua do próprio Firecast
 python check_lua.py        sintaxe de todos os .lua/.dlua do plugin
 ```
+
+## Licença
+
+MIT (veja `LICENSE`). Os arquivos do SDK do Firecast que vão dentro do `.rpk` e o som `plugin/sons/highlight.mp3`
+são do Grupo RRPG Firecast e não entram na licença.
