@@ -80,7 +80,7 @@ Os erros de plugin ficam em `%LOCALAPPDATA%\Firecast\LogErrors\Firecast-debugLog
 - **Aura em GIF:** a transparência é só liga/desliga, então a borda suave vira pontilhado (dither).
 - **Aviso de versão nova:** não implementado, porque não há Release pública para consultar.
 
-## Trailer (trailer3/)
+## Trailer (trailer3/, só local: fora do repositório)
 Trailer narrado gerado por código: mesa 3D no Blender em modo fundo (`cena_blender.py`), vozes neurais locais
 (Chatterbox Multilingual na GPU, clonando timbres sintéticos do Kokoro, em `trailer3/.venv-chatterbox`; cada fala é
 conferida pelo Whisper em `trailer3/.venv-voz` e refeita se sair errada), trilha e efeitos sintetizados (`sons.py`)
