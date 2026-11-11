@@ -20,7 +20,7 @@ local PRESETS = {
 
 -- fontes que vem com o Windows; Roboto e a do tema
 local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS", "Bahnschrift", "OpenDyslexic"}
-local TAMANHOS = {{"Normal", "14"}, {"Grande", "16"}, {"Maior", "18"}, {"Enorme", "21"}}
+local TAMANHO_PADRAO = 14
 
 local cfg = NDB.load("cores.xml")
 
@@ -38,11 +38,9 @@ local function construir()
 		novo("label", l, {align = "left", width = 90, text = rotulo, fontColor = "white"})
 		return l
 	end
-	local nomesTam, valoresTam = {}, {}
-	for i, t in ipairs(TAMANHOS) do nomesTam[i], valoresTam[i] = t[1], t[2] end
 	local fonte = novo("comboBox", linha("Fonte"), {align = "client", items = FONTES, values = FONTES})
-	local tamanho = novo("comboBox", linha("Texto do chat"), {align = "client", items = nomesTam, values = valoresTam})
-	fonte.value, tamanho.value = cfg.fonte or FONTES[1], cfg.tamanho or TAMANHOS[1][2]  -- depois dos items
+	local tamanho = novo("edit", linha("Texto do chat (10–40)"), {align = "client"})
+	fonte.value, tamanho.text = cfg.fonte or FONTES[1], tostring(cfg.tamanho or TAMANHO_PADRAO)
 
 	-- previa: so desta janela; o Firecast inteiro muda depois de reiniciar
 	local previa = novo("rectangle", fundo, {align = "top", height = 76, margins = {top = 10}, xradius = 6, yradius = 6})
@@ -55,7 +53,8 @@ local function construir()
 		previaTexto.fontColor = campos.texto.color
 		previaBotao.color = campos.destaque.color
 		previaTexto.fontFamily = fonte.value
-		previaTexto.fontSize = tonumber(tamanho.value) or 14
+		local valor = tonumber(tamanho.text)
+		if valor and valor >= 10 and valor <= 40 and valor % 1 == 0 then previaTexto.fontSize = valor end
 	end
 
 	local function usar(d, f, t)
@@ -101,17 +100,22 @@ local function construir()
 	end
 
 	btnAplicar:addEventListener("onClick", function()
+		local valor = tonumber(tamanho.text)
+		if not valor or valor < 10 or valor > 40 or valor % 1 ~= 0 then
+			status.text = "Digite um tamanho inteiro entre 10 e 40."
+			return
+		end
 		cfg.destaque, cfg.fundo, cfg.texto = campos.destaque.color, campos.fundo.color, campos.texto.color
-		cfg.fonte, cfg.tamanho, cfg.skin = fonte.value, tamanho.value, skin
+		cfg.fonte, cfg.tamanho, cfg.skin = fonte.value, valor, skin
 		pedir(string.format('{"acao":"aplicar","destaque":"%s","fundo":"%s","texto":"%s","fonte":"%s","tamanho_chat":%d%s}',
-			tostring(cfg.destaque), tostring(cfg.fundo), tostring(cfg.texto), tostring(cfg.fonte), tonumber(cfg.tamanho) or 14,
+			tostring(cfg.destaque), tostring(cfg.fundo), tostring(cfg.texto), tostring(cfg.fonte), cfg.tamanho,
 			skin and (',"skin":"' .. skin .. '"') or ""))
 	end)
 	btnOriginal:addEventListener("onClick", function()
 		usar(PRESETS[1][2], PRESETS[1][3], PRESETS[1][4])
 		skin = nil
 		cfg.destaque, cfg.fundo, cfg.texto, cfg.fonte, cfg.tamanho, cfg.skin = nil, nil, nil, nil, nil, nil
-		fonte.value, tamanho.value = FONTES[1], TAMANHOS[1][2]
+		fonte.value, tamanho.text = FONTES[1], tostring(TAMANHO_PADRAO)
 		pedir('{"acao":"restaurar"}')
 	end)
 	for _, c in pairs(campos) do c:addEventListener("onChange", atualizarPrevia) end
