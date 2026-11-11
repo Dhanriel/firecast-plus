@@ -417,12 +417,11 @@ def _hex(v):
     """O seletor de cor do Firecast devolve #RRGGBB, #RRGGBBAA ou, nas cores com nome, o nome ("Black", "White")."""
     if re.fullmatch(r"#[0-9A-Fa-f]{6}([0-9A-Fa-f]{2})?", v):
         return v[:7].upper()
-    import tkinter  # o Tk conhece os nomes de cor
-    tk = tkinter.Tk()
+    nomes = {"black": "#000000", "white": "#FFFFFF", "red": "#FF0000"}
     try:
-        return "#%02X%02X%02X" % tuple(c >> 8 for c in tk.winfo_rgb(v))
-    finally:
-        tk.destroy()
+        return nomes[v.casefold()]
+    except (AttributeError, KeyError):
+        raise ValueError(f"cor invalida: {v!r}") from None
 
 
 def cfg_do_pedido(pedido):

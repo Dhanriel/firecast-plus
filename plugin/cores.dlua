@@ -19,7 +19,7 @@ local PRESETS = {
 }
 
 -- fontes que vem com o Windows; Roboto e a do tema
-local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS", "Bahnschrift"}
+local FONTES = {"Roboto", "Segoe UI", "Arial", "Verdana", "Tahoma", "Calibri", "Georgia", "Trebuchet MS", "Comic Sans MS", "Bahnschrift", "OpenDyslexic"}
 local TAMANHOS = {{"Normal", "14"}, {"Grande", "16"}, {"Maior", "18"}, {"Enorme", "21"}}
 
 local cfg = NDB.load("cores.xml")
