@@ -97,10 +97,10 @@ def pacote():
         for n in ("dist/momotoro.firecast.plus.rpk", "instalar.bat", "instalar.ps1", "fcplus.py", "Firecast Plus.pyw",
                   "editor_skins.py", "Editor de Skins.pyw", "README.md", "LICENSE"):
             z.write(os.path.join(HERE, n), "FirecastPlus/" + n)
-        for raiz, _, nomes in os.walk(os.path.join(HERE, "skins")):
-            for n in nomes:
-                p = os.path.join(raiz, n)
-                z.write(p, "FirecastPlus/" + os.path.relpath(p, HERE).replace("\\", "/"))
+        # O ZIP leva apenas skins versionadas; arquivos locais podem conter dados pessoais.
+        for p in subprocess.check_output(["git", "ls-files", "-z", "--", "skins"], cwd=HERE).decode().split("\0"):
+            if p:
+                z.write(os.path.join(HERE, p), "FirecastPlus/" + p)
     print("pacote:", out)
 
 
