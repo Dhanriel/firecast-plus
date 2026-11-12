@@ -1,4 +1,5 @@
 require("firecast.lua")
+require("retomar.dlua")
 local Cores = require("cores.dlua")
 local Palavras = require("palavras.dlua")
 local Piscar = require("piscar.dlua")

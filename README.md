@@ -11,8 +11,7 @@ Usa só o SDK oficial de plugins e arquivos locais. Não mexe no protocolo nem n
 2. Feche o Firecast (inclusive o ícone perto do relógio).
 3. Dê dois cliques em `instalar.bat`. Ele completa o plugin com arquivos do seu próprio Firecast (o SDK e o som de
    menção) e o instala em `%APPDATA%\Firecast\Plugins`.
-4. O instalador pergunta se você quer o **ajudante**, que usa Python 3. Se responder sim, ele cria o atalho
-   **Firecast Plus** na área de trabalho. Abra o Firecast sempre por esse atalho.
+4. O instalador pergunta se você quer o **ajudante**, que usa Python 3. Se responder sim, ele cria o atalho **Firecast Plus** na área de trabalho. Abra o Firecast por ele.
    Se o Python não estiver instalado, o instalador oferece baixar o Python 3.12 do python.org (só para o seu usuário,
    uns 25 MB). Ele confere a assinatura digital da Python Software Foundation antes de instalar.
    Se um ajudante de uma versão anterior estiver aberto, o instalador o fecha, para o atalho abrir o novo.
@@ -22,7 +21,7 @@ O ajudante é necessário para:
 - piscar o ícone por mesa ou aba;
 - reaplicar a skin depois de uma atualização do Firecast.
 
-As outras funções funcionam só com o plugin.
+A retomada de salas funciona só com o plugin e não precisa do ajudante. O clique em **Entrar na mesa** e a senha continuam manuais. As outras funções também funcionam só com o plugin.
 
 ## Editor de Skins
 
@@ -64,6 +63,7 @@ ela sai do projeto.
 | `/multi N rolagem [texto]` | rola a mesma rolagem N vezes |
 | `/sorteio [texto]` | sorteia um jogador da mesa |
 | `/timer segundos [texto]` | lembrete que só você vê |
+| Ao abrir o Firecast | abre as salas em que sua conta estava. Você confirma **Entrar na mesa** e informa a senha, se houver. Na primeira inicialização, aparece o painel de escolha; depois de confirmado, ele fecha e a janela pequena **Firecast Plus** no RRPG reabre **Retomada de mesas** quando você clicar |
 | Mapa > Firecast Plus > **Meu token** | cria o seu token (avatar e nick) onde você clicar. Um por pessoa |
 | Mapa > Firecast Plus > **Remover meu token** | remove o token criado pelo plugin |
 | Mapa > Firecast Plus > **Aura** | aura animada de luz (aro brilhante, runas girando e faíscas) em volta do token selecionado, com cor, tamanho e intensidade. Todos veem, até quem não tem o plugin |

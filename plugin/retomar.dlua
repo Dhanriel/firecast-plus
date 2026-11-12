@@ -1,0 +1,121 @@
+require("firecast.lua")
+require("gui.lua")
+require("ndb.lua")
+require("vhd.lua")
+local UI = require("ui.dlua")
+
+local retomar = {}
+local cfg = NDB.load("retomar.xml")
+local abertas = {}
+local nestaSessao = {}
+local agendarSalas
+
+local function habilitado()
+	if not VHD.fileExists("retomar.ativo") then return true end
+	local f = VHD.openFile("retomar.ativo", "r")
+	if f == nil then return false end
+	local bytes = {}
+	local n = f:read(bytes, f.size) or 0
+	f:close()
+	local chars = {}
+	for i = 1, n do chars[i] = string.char(bytes[i]) end
+	return table.concat(chars) == "1"
+end
+
+local function abrirControle()
+	local frm, fundo = UI.janela("frmFCPlusRetomar", "Retomada de mesas", 350, 150)
+	local cb = UI.novo("checkBox", fundo, {align = "top", height = 32, text = "Reabrir mesas salvas automaticamente", checked = habilitado(), fontColor = "white"})
+	UI.novo("label", fundo, {align = "top", height = 48, wordWrap = true, fontSize = 11, fontColor = "#BBBBBB",
+		text = "O Firecast abre as salas salvas. A entrada na mesa e senhas continuam manuais."})
+	local status = UI.novo("label", fundo, {align = "bottom", height = 20, fontSize = 11, fontColor = "#BBBBBB"})
+	local confirmar = UI.novo("button", fundo, {align = "bottom", height = 30, text = "Confirmar escolha"})
+	confirmar:addEventListener("onClick", function()
+		if not UI.escrever("retomar.ativo", cb.checked and "1" or "0") then
+			status.text = "Não foi possível salvar a preferência."
+			return
+		end
+		cfg.controleEscolhido = true
+		frm:close()
+		agendarSalas()
+	end)
+	frm:endUpdate()
+	frm:show()
+end
+
+local function mostrarAcesso()
+	local frm, fundo = UI.janela("frmFCPlusRetomarAcesso", "Firecast Plus", 190, 74)
+	local abrir = UI.novo("button", fundo, {align = "client", text = "Retomada de mesas"})
+	abrir:addEventListener("onClick", abrirControle)
+	frm:endUpdate()
+	frm:show()
+end
+
+local function dados(mesa)
+	if mesa == nil then return nil end
+	local uri = tostring(mesa.firecastURI or "")
+	local id = uri:match("^https://vtt%.firecast%.app/artifacts/rooms/(%d+)$")
+	if id == nil then return nil end
+	return id, uri
+end
+
+local function carregar()
+	local salas = {}
+	for linha in tostring(cfg.dados or ""):gmatch("[^\r\n]+") do
+		local id, uri = linha:match("^(%d+)\t([^\t]+)")
+		if id ~= nil and dados({firecastURI = uri}) == id then salas[id] = {uri = uri} end
+	end
+	return salas
+end
+
+local function salvar(salas)
+	local linhas = {}
+	for id, sala in pairs(salas) do linhas[#linhas + 1] = id .. "\t" .. sala.uri end
+	table.sort(linhas)
+	cfg.dados = table.concat(linhas, "\n")
+end
+
+local function lembrar(mesa)
+	local id, uri = dados(mesa)
+	if id == nil then return end
+	abertas[id], nestaSessao[id] = {uri = uri}, true
+	salvar(abertas)
+end
+
+local function esquecer(mesa)
+	local id = dados(mesa)
+	if id == nil then return end
+	abertas[id], nestaSessao[id] = nil, nil
+	salvar(abertas)
+end
+
+Firecast.Messaging.listen("MesaJoined", function(message)
+	if message.me then lembrar(message.room) end
+end)
+
+Firecast.Messaging.listen("MesaParted", function(message)
+	if message.me then esquecer(message.room) end
+end)
+
+abertas = carregar()
+local salasAgendadas = false
+agendarSalas = function()
+	if salasAgendadas or cfg.controleEscolhido ~= true or not habilitado() then return end
+	salasAgendadas = true
+	local ids = {}
+	for id in pairs(abertas) do ids[#ids + 1] = id end
+	table.sort(ids)
+	for i, id in ipairs(ids) do
+		setTimeout(function()
+			if abertas[id] ~= nil and not nestaSessao[id] and habilitado() then
+				pcall(GUI.asyncOpenFirecastURI, abertas[id].uri, {newTab = true, autoFocus = i == 1})
+			end
+		end, 3000 + (i - 1) * 1500)
+	end
+end
+
+setTimeout(function()
+	mostrarAcesso()
+	if cfg.controleEscolhido ~= true then abrirControle() else agendarSalas() end
+end, 1000)
+
+return retomar

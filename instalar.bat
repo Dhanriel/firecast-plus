@@ -20,7 +20,7 @@ powershell -NoProfile -ExecutionPolicy Bypass -File "%~dp0instalar.ps1" -Base "d
 )
 echo Plugin instalado. Abra o Firecast e digite /fc numa mesa.
 echo.
-echo O ajudante ^(opcional^) faz funcionar: cores do Firecast, piscar na barra de tarefas e reaplicar a skin apos atualizacoes.
+echo O ajudante ^(opcional^) faz funcionar: skins, piscar na barra de tarefas e atualizacao das skins.
 choice /C SN /M "Criar o atalho 'Firecast Plus' na area de trabalho (usa Python 3; se faltar, ofereco instalar)"
 if errorlevel 2 goto fim
 rem "python" pode ser so o atalho da Microsoft Store, que nao roda nada: testa de verdade
